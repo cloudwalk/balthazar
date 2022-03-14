@@ -1,8 +1,5 @@
 use std::fmt::Debug;
 
-use clap::{Args, Parser};
-use eyre::Result;
-
 #[cfg(logging)]
 mod tracing;
 
@@ -10,6 +7,8 @@ mod tracing;
 mod database;
 
 pub mod prelude;
+
+use prelude::*;
 
 #[derive(Debug, Clone)]
 pub struct Environment<T: Debug + Clone + Args> {
