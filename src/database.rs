@@ -1,10 +1,8 @@
 use std::ops::Deref;
 
-use clap::Parser;
-use eyre::Result;
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 
-pub use sqlx;
+use crate::prelude::*;
 
 #[derive(Debug, Clone, Parser)]
 pub struct DatabaseConfig {
@@ -21,7 +19,7 @@ pub struct Database {
 }
 
 impl Database {
-    pub async fn init(config: DatabaseConfig) -> Result<Self> {
+    pub async fn init(config: EnvironmentConfig) -> Result<Self> {
         Ok(Self {
             pool: PgPoolOptions::new()
                 .max_connections(config.pool_max_connections)

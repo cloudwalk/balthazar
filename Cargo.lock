@@ -69,6 +69,7 @@ dependencies = [
  "opentelemetry-jaeger",
  "postgres",
  "sqlx",
+ "thiserror",
  "tokio",
  "tracing",
  "tracing-opentelemetry",

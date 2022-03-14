@@ -3,7 +3,7 @@ use eyre::Result;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Registry};
 use tracing_tree::HierarchicalLayer;
 
-pub use tracing::{debug, error, info, instrument, span, trace, warn};
+use crate::prelude::*;
 
 #[derive(Debug, Clone, Parser)]
 pub struct TracingConfig {
@@ -20,8 +20,10 @@ pub struct TracingConfig {
 #[derive(Debug, Clone)]
 pub struct Tracing;
 
-impl Tracing {
-    pub fn init(config: TracingConfig) -> Result<Self> {
+impl Feature for Tracing {
+    fn init(config: EnvironmentConfig) -> Result<Self> {
+        let config = config.tracing;
+
         std::env::set_var(
             "RUST_LOG",
             format!("{0}={1},tokio={1}", module_path!(), &config.log_level),

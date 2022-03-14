@@ -3,23 +3,31 @@ use std::fmt::Debug;
 use clap::{Args, Parser};
 use eyre::Result;
 
-mod database;
+#[cfg(logging)]
 mod tracing;
 
-pub use self::database::*;
-pub use self::tracing::*;
+#[cfg(database)]
+mod database;
+
+pub mod prelude;
 
 #[derive(Debug, Clone)]
 pub struct Environment<T: Debug + Clone + Args> {
     pub config: Config<T>,
+
+    #[cfg(logging)]
     pub tracing: Tracing,
+    #[cfg(database)]
     pub database: Database,
 }
 
 #[derive(Debug, Clone, Parser)]
 pub struct EnvironmentConfig {
+    #[cfg(database)]
     #[clap(flatten)]
     pub database: DatabaseConfig,
+
+    #[cfg(logging)]
     #[clap(flatten)]
     pub tracing: TracingConfig,
 }
@@ -41,8 +49,12 @@ impl<T: Debug + Clone + Args> Config<T> {
         } = Self::parse();
 
         Ok(Environment {
-            tracing: Tracing::init(environment.tracing.clone())?,
-            database: Database::init(environment.database.clone()).await?,
+            #[cfg(logging)]
+            tracing: Tracing::init(environment.clone())?,
+
+            #[cfg(database)]
+            database: Database::init(environment.clone()).await?,
+
             config: Self {
                 project,
                 environment,
