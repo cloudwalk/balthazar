@@ -6,7 +6,7 @@ pub use thiserror::Error;
 
 // Type Replacements
 pub use eyre::Result;
-pub use tokio::sync::RwLock;
+pub use tokio::{main as async_main, sync::RwLock};
 
 #[cfg(logging)]
 pub use tracing::{debug, error, info, instrument, span, trace, warn};
