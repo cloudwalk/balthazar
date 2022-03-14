@@ -1,7 +1,7 @@
 pub use crate::{Environment, EnvironmentConfig};
 
 // Traits
-pub use clap::{Args, Parser};
+pub use clap::{self, Args, Parser};
 pub use thiserror::Error;
 
 // Type Replacements

@@ -7,7 +7,7 @@ edition = "2021"
 clap = { version = "3.1.6", features = ["derive", "env"] }
 eyre = "0.6.7"
 thiserror = { version = "1.0.30" }
-tokio = { version = "1.17.0", features = ["rt-multi-thread", "macros", "tracing"] }
+tokio = { version = "1.17.0", features = ["rt-multi-thread", "macros"] }
 
 opentelemetry = { optional = true, version = "0.17.0" }
 opentelemetry-jaeger = { optional = true, version = "0.16.0" }
@@ -17,6 +17,7 @@ tracing-subscriber = { optional = true, version = "0.3.9" }
 tracing-tree = { optional = true, version = "0.2.0" }
 postgres = { optional = true, version = "0.19.2" }
 sqlx = { optional = true, version = "0.5.11" }
+color-eyre = "0.6.1"
 
 [features]
 default = ["logging"]
@@ -27,11 +28,12 @@ logging = [
     "opentelemetry-jaeger/rt-tokio",
     "opentelemetry-jaeger/collector_client",
     "opentelemetry-jaeger/reqwest_collector_client",
+    "tokio/tracing",
     "tracing",
     "tracing-opentelemetry",
     "tracing-subscriber",
     "tracing-subscriber/env-filter",
-    "tracing-tree"
+    "tracing-tree",
 ]
 database = [
     "postgres",

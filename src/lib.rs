@@ -1,5 +1,7 @@
 use std::fmt::Debug;
 
+mod core;
+
 #[cfg(logging)]
 mod tracing;
 
@@ -22,6 +24,9 @@ pub struct Environment<T: Debug + Clone + Args> {
 
 #[derive(Debug, Clone, Parser)]
 pub struct EnvironmentConfig {
+    #[clap(flatten)]
+    pub core: core::CoreConfig,
+
     #[cfg(database)]
     #[clap(flatten)]
     pub database: DatabaseConfig,
@@ -46,6 +51,8 @@ impl<T: Debug + Clone + Args> Config<T> {
             project,
             environment,
         } = Self::parse();
+
+        core::Core::init(environment.clone())?;
 
         Ok(Environment {
             #[cfg(logging)]
