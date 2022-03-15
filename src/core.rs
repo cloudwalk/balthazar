@@ -2,15 +2,15 @@ use crate::prelude::*;
 
 #[derive(Debug, Clone, Parser)]
 pub struct CoreConfig {
-    #[clap(short, long, env = "NO_COLORS")]
-    pub no_colors: bool,
+    #[clap(short, long, env = "NO_COLOR")]
+    pub no_color: bool,
 }
 
 pub struct Core;
 
 impl Feature for Core {
     fn init(config: EnvironmentConfig) -> Result<Self> {
-        if !config.core.no_colors {
+        if !config.core.no_color {
             color_eyre::install()?;
         }
 
