@@ -41,7 +41,8 @@ impl Feature for Tracing {
             .with(
                 HierarchicalLayer::new(2)
                     .with_targets(true)
-                    .with_bracketed_fields(true),
+                    .with_bracketed_fields(true)
+                    .with_ansi(config.core.no_colors),
             )
             .with(telemetry)
             .init();
