@@ -11,7 +11,11 @@ pub use thiserror::Error;
 pub use eyre::Result;
 pub use tokio::{main as async_main, sync::RwLock};
 
-pub use tracing::{debug, error, info, instrument, span, trace, warn};
+pub use tracing::{
+    debug, error, info,
+    instrument::{self, Instrument},
+    span, trace, warn,
+};
 
 #[cfg(database)]
 pub use sqlx as sql;
