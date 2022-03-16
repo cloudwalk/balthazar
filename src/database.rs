@@ -22,8 +22,8 @@ impl Database {
     pub async fn init(config: EnvironmentConfig) -> Result<Self> {
         Ok(Self {
             pool: PgPoolOptions::new()
-                .max_connections(config.pool_max_connections)
-                .connect(&config.url)
+                .max_connections(config.database.pool_max_connections)
+                .connect(&config.database.url)
                 .await?,
         })
     }
