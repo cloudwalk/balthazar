@@ -1,8 +1,6 @@
 use std::fmt::Debug;
 
 mod core;
-
-#[cfg(logging)]
 mod tracing;
 
 #[cfg(database)]
@@ -15,9 +13,8 @@ use prelude::*;
 #[derive(Debug, Clone)]
 pub struct Environment<T: Debug + Clone + Args> {
     pub config: Config<T>,
+    pub tracing: tracing::Tracing,
 
-    #[cfg(logging)]
-    pub tracing: Tracing,
     #[cfg(database)]
     pub database: Database,
 }
@@ -27,13 +24,12 @@ pub struct EnvironmentConfig {
     #[clap(flatten)]
     pub core: core::CoreConfig,
 
+    #[clap(flatten)]
+    pub tracing: tracing::TracingConfig,
+
     #[cfg(database)]
     #[clap(flatten)]
     pub database: DatabaseConfig,
-
-    #[cfg(logging)]
-    #[clap(flatten)]
-    pub tracing: TracingConfig,
 }
 
 #[derive(Debug, Clone, Parser)]
@@ -55,7 +51,6 @@ impl<T: Debug + Clone + Args> Config<T> {
         core::Core::init(environment.clone())?;
 
         Ok(Environment {
-            #[cfg(logging)]
             tracing: Tracing::init(environment.clone())?,
 
             #[cfg(database)]

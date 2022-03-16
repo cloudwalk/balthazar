@@ -1,4 +1,7 @@
-pub use crate::{Environment, EnvironmentConfig};
+pub use crate::{
+    tracing::{Tracing, TracingConfig},
+    Environment, EnvironmentConfig,
+};
 
 // Traits
 pub use clap::{self, Args, Parser};
@@ -8,7 +11,6 @@ pub use thiserror::Error;
 pub use eyre::Result;
 pub use tokio::{main as async_main, sync::RwLock};
 
-#[cfg(logging)]
 pub use tracing::{debug, error, info, instrument, span, trace, warn};
 
 #[cfg(database)]

@@ -22,15 +22,17 @@ pub struct Tracing;
 
 impl Feature for Tracing {
     fn init(config: EnvironmentConfig) -> Result<Self> {
-        let config = config.tracing;
-
         std::env::set_var(
             "RUST_LOG",
-            format!("{0}={1},tokio={1}", module_path!(), &config.log_level),
+            format!(
+                "{0}={1},tokio={1}",
+                module_path!(),
+                &config.tracing.log_level
+            ),
         );
 
         let tracer = opentelemetry_jaeger::new_pipeline()
-            .with_collector_endpoint(&config.opentelemetry_endpoint)
+            .with_collector_endpoint(&config.tracing.opentelemetry_endpoint)
             .with_service_name(module_path!())
             .install_batch(opentelemetry::runtime::Tokio)?;
 
