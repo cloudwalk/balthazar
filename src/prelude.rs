@@ -3,6 +3,9 @@ pub use crate::{
     Environment, EnvironmentConfig,
 };
 
+#[cfg(feature = "database")]
+pub use crate::database::{Database, DatabaseConfig};
+
 // Traits
 pub use clap::{self, Args, Parser};
 pub use thiserror::Error;
