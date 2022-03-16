@@ -14,7 +14,7 @@ pub use thiserror::Error;
 pub use eyre::Result;
 pub use tokio::{main as async_main, sync, task, time};
 
-pub use tracing::{debug, error, info, instrument::Instrument, span, trace, warn};
+pub use tracing::{debug, error, info, instrument, instrument::Instrument, span, trace, warn};
 
 #[cfg(feature = "database")]
 pub use sqlx as sql;
