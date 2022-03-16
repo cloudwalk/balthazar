@@ -3,7 +3,7 @@ use std::fmt::Debug;
 mod core;
 mod tracing;
 
-#[cfg(database)]
+#[cfg(feature = "database")]
 mod database;
 
 pub mod prelude;
@@ -15,7 +15,7 @@ pub struct Environment<T: Debug + Clone + Args> {
     pub config: Config<T>,
     pub tracing: tracing::Tracing,
 
-    #[cfg(database)]
+    #[cfg(feature = "database")]
     pub database: Database,
 }
 
@@ -27,7 +27,7 @@ pub struct EnvironmentConfig {
     #[clap(flatten)]
     pub tracing: tracing::TracingConfig,
 
-    #[cfg(database)]
+    #[cfg(feature = "database")]
     #[clap(flatten)]
     pub database: DatabaseConfig,
 }
@@ -53,7 +53,7 @@ impl<T: Debug + Clone + Args> Config<T> {
         Ok(Environment {
             tracing: Tracing::init(environment.clone())?,
 
-            #[cfg(database)]
+            #[cfg(feature = "database")]
             database: Database::init(environment.clone()).await?,
 
             config: Self {

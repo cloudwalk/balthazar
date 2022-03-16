@@ -17,7 +17,7 @@ pub use tracing::{
     span, trace, warn,
 };
 
-#[cfg(database)]
+#[cfg(feature = "database")]
 pub use sqlx as sql;
 
 // Feature enablement
