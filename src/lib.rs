@@ -11,8 +11,6 @@ pub use tokio::{self, main};
 mod database;
 #[cfg(feature = "database")]
 pub use crate::database::{Database, DatabaseConfig};
-#[cfg(feature = "database")]
-pub use sqlx as sql;
 
 // Feature enablement
 pub trait Feature {
