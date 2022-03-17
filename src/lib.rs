@@ -1,15 +1,11 @@
 use std::fmt::Debug;
 mod core;
 mod tracing;
-pub use crate::{
-    tracing::{Tracing, TracingConfig},
-    Environment, EnvironmentConfig,
-};
+pub use crate::tracing::{Tracing, TracingConfig};
 pub use clap::{self, Args, Parser};
 pub use eyre::Result;
 pub use thiserror::Error;
-pub use tokio::{main, sync, task, time};
-pub use tracing::{debug, error, info, span, trace, warn};
+pub use tokio::{self, main};
 
 #[cfg(feature = "database")]
 mod database;

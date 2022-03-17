@@ -1,9 +1,7 @@
-use clap::Parser;
-use eyre::Result;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Registry};
 use tracing_tree::HierarchicalLayer;
 
-use crate::prelude::*;
+use crate::{EnvironmentConfig, Feature, Parser, Result};
 
 #[derive(Debug, Clone, Parser)]
 pub struct TracingConfig {

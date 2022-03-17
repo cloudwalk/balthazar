@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 
-use crate::prelude::*;
+use crate::*;
 
 #[derive(Debug, Clone, Parser)]
 pub struct DatabaseConfig {
