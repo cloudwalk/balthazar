@@ -1,14 +1,29 @@
 use std::fmt::Debug;
-
 mod core;
 mod tracing;
+pub use crate::{
+    tracing::{Tracing, TracingConfig},
+    Environment, EnvironmentConfig,
+};
+pub use clap::{self, Args, Parser};
+pub use eyre::Result;
+pub use thiserror::Error;
+pub use tokio::{main, sync, task, time};
+pub use tracing::{debug, error, info, span, trace, warn};
 
 #[cfg(feature = "database")]
 mod database;
+#[cfg(feature = "database")]
+pub use crate::database::{Database, DatabaseConfig};
+#[cfg(feature = "database")]
+pub use sqlx as sql;
 
-pub mod prelude;
-
-use prelude::*;
+// Feature enablement
+pub trait Feature {
+    fn init(config: EnvironmentConfig) -> Result<Self>
+    where
+        Self: Sized;
+}
 
 #[derive(Debug, Clone)]
 pub struct Environment<T: Debug + Clone + Args> {
