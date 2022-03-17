@@ -4,7 +4,6 @@ mod tracing;
 pub use crate::tracing::{Tracing, TracingConfig};
 pub use clap::{self, Args, Parser};
 pub use eyre::Result;
-pub use thiserror::Error;
 pub use tokio::{self, main};
 
 #[cfg(feature = "database")]
