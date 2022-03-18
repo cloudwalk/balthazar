@@ -19,6 +19,7 @@ postgres = { optional = true, version = "0.19" }
 sqlx = { optional = true, version = "0.5" }
 async-trait = "0.1.52"
 futures-util = "0.3.21"
+ethereum-types = "0.13.1"
 
 [features]
 database = [
