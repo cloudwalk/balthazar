@@ -97,6 +97,7 @@ dependencies = [
  "clap",
  "color-eyre",
  "eyre",
+ "futures-util",
  "opentelemetry",
  "opentelemetry-jaeger",
  "postgres",
