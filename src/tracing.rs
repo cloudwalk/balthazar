@@ -20,14 +20,7 @@ pub struct Tracing;
 
 impl Feature for Tracing {
     fn init(config: EnvironmentConfig) -> Result<Self> {
-        std::env::set_var(
-            "RUST_LOG",
-            format!(
-                "{0}={1},tokio={1}",
-                module_path!(),
-                &config.tracing.log_level
-            ),
-        );
+        std::env::set_var("RUST_LOG", &config.tracing.log_level);
 
         let tracer = opentelemetry_jaeger::new_pipeline()
             .with_collector_endpoint(&config.tracing.opentelemetry_endpoint)
