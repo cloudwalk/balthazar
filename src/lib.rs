@@ -1,7 +1,11 @@
 use std::fmt::Debug;
+
 mod core;
 mod tracing;
+
 pub use crate::tracing::{Tracing, TracingConfig};
+
+pub use async_trait::async_trait;
 pub use clap::{self, Args, Parser};
 pub use eyre::Result;
 pub use tokio::{self, main};
