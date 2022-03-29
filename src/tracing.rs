@@ -10,6 +10,12 @@ use crate::{EnvironmentConfig, Feature, Parser, Result};
 #[derive(Debug, Clone, Parser)]
 pub struct TracingConfig {
     #[clap(
+        long = "tracing-disable-opentelemetry",
+        env = "TRACING_DISABLE_OPENTELEMETRY"
+    )]
+    pub disable_opentelemetry: bool,
+
+    #[clap(
         env = "TRACING_OPENTELEMETRY_ENDPOINT",
         default_value = "http://localhost:14268/api/traces"
     )]
@@ -29,11 +35,15 @@ impl Feature for Tracing {
     fn init(config: EnvironmentConfig) -> Result<Self> {
         std::env::set_var("RUST_LOG", &config.tracing.log_level);
 
-        let tracer = opentelemetry_jaeger::new_pipeline()
-            .with_collector_endpoint(&config.tracing.opentelemetry_endpoint)
-            .with_service_name(module_path!())
-            .install_batch(opentelemetry::runtime::Tokio)?;
-        let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
+        let telemetry = if config.tracing.disable_opentelemetry {
+            None
+        } else {
+            let tracer = opentelemetry_jaeger::new_pipeline()
+                .with_collector_endpoint(&config.tracing.opentelemetry_endpoint)
+                .with_service_name(module_path!())
+                .install_batch(opentelemetry::runtime::Tokio)?;
+            Some(tracing_opentelemetry::layer().with_tracer(tracer))
+        };
 
         // tracing_subscriber lib currently does not support dynamically adding layer to registry
         // accordingly to some condition. this can be verified in the following issues:
@@ -59,7 +69,7 @@ impl Feature for Tracing {
                             .with_target(true)
                             .with_file(false)
                             .with_line_number(false)
-                            .with_ansi(!config.core.no_color)
+                            .with_ansi(!config.core.no_color),
                     ),
                     None,
                 ),
