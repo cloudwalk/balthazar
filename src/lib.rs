@@ -1,8 +1,10 @@
 use std::fmt::Debug;
 
+mod lang;
 mod core;
 mod tracing;
 
+pub use crate::lang::sensitive_string::SensitiveString;
 pub use crate::tracing::{Tracing, TracingConfig};
 
 pub use async_trait::async_trait;
@@ -14,6 +16,7 @@ pub use tokio::{self, main};
 
 #[cfg(feature = "database")]
 mod database;
+
 #[cfg(feature = "database")]
 pub use crate::database::{Database, DatabaseConfig};
 
