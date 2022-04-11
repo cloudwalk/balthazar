@@ -19,7 +19,7 @@ pub struct Database {
 }
 
 impl Database {
-    pub async fn init(config: EnvironmentConfig) -> Result<Self> {
+    pub async fn init(_service_name: String, config: EnvironmentConfig) -> Result<Self> {
         Ok(Self {
             pool: PgPoolOptions::new()
                 .max_connections(config.database.pool_max_connections)

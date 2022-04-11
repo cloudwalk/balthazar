@@ -22,13 +22,14 @@ pub use crate::database::{Database, DatabaseConfig};
 
 // Feature enablement
 pub trait Feature {
-    fn init(config: EnvironmentConfig) -> Result<Self>
+    fn init(service_name: String, config: EnvironmentConfig) -> Result<Self>
     where
         Self: Sized;
 }
 
 #[derive(Debug, Clone)]
 pub struct Environment<T: Debug + Clone + Args> {
+    pub service_name: String,
     pub config: Config<T>,
     pub tracing: tracing::Tracing,
 
@@ -59,19 +60,20 @@ pub struct Config<T: Debug + Clone + Args> {
 }
 
 impl<T: Debug + Clone + Args> Config<T> {
-    pub async fn init() -> Result<Environment<T>> {
+    pub async fn init(service_name: String) -> Result<Environment<T>> {
         let Self {
             project,
             environment,
         } = Self::parse();
 
-        core::Core::init(environment.clone())?;
+        core::Core::init(service_name.clone(), environment.clone())?;
 
         Ok(Environment {
-            tracing: Tracing::init(environment.clone())?,
+            service_name: service_name.clone(),
+            tracing: Tracing::init(service_name.clone(), environment.clone())?,
 
             #[cfg(feature = "database")]
-            database: Database::init(environment.clone()).await?,
+            database: Database::init(service_name.clone(), environment.clone()).await?,
 
             config: Self {
                 project,
