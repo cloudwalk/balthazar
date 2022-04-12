@@ -9,7 +9,7 @@ pub struct CoreConfig {
 pub struct Core;
 
 impl Feature for Core {
-    fn init(config: EnvironmentConfig) -> Result<Self> {
+    fn init(_service_name: String, config: EnvironmentConfig) -> Result<Self> {
         if !config.core.no_color {
             color_eyre::install()?;
         }
