@@ -69,8 +69,8 @@ impl Feature for Tracing {
                             .with_thread_ids(true)
                             .with_thread_names(true)
                             .with_target(true)
-                            .with_file(false)
-                            .with_line_number(false)
+                            .with_file(true)
+                            .with_line_number(true)
                             .with_ansi(!config.core.no_color),
                     ),
                     None,
