@@ -42,7 +42,9 @@ impl Feature for Tracing {
                 .with_collector_endpoint(&config.tracing.opentelemetry_endpoint)
                 .with_service_name(service_name)
                 .install_batch(opentelemetry::runtime::Tokio)?;
-            Some(tracing_opentelemetry::layer().with_tracer(tracer))
+            Some(tracing_opentelemetry::layer()
+                .with_tracked_inactivity(false)
+                .with_tracer(tracer))
         };
 
         // tracing_subscriber lib currently does not support dynamically adding layer to registry
@@ -67,8 +69,8 @@ impl Feature for Tracing {
                             .with_thread_ids(true)
                             .with_thread_names(true)
                             .with_target(true)
-                            .with_file(false)
-                            .with_line_number(false)
+                            .with_file(true)
+                            .with_line_number(true)
                             .with_ansi(!config.core.no_color),
                     ),
                     None,
