@@ -7,23 +7,23 @@ edition = "2021"
 clap = { version = "3.1", features = ["derive", "env"] }
 color-eyre = "0.6"
 eyre = "0.6"
-tokio = { version = "1.17.0", features = ["rt-multi-thread", "macros", "tracing", "signal"] }
+tokio = { version = "1.17", features = ["rt-multi-thread", "macros", "tracing", "signal"] }
 opentelemetry = { version = "0.17", features = ["rt-tokio"] }
 opentelemetry-jaeger = { version = "0.16", features = ["rt-tokio", "collector_client", "reqwest_collector_client"] }
 tracing = "0.1"
 tracing-opentelemetry = "0.17"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-tree = "0.2"
-async-trait = "0.1.52"
-futures-util = "0.3.21"
-ethereum-types = "0.13.1"
+async-trait = "0.1"
+futures-util = "0.3"
+ethereum-types = "0.13"
 
 # database
 postgres = { optional = true, version = "0.19" }
 sqlx = { optional = true, version = "0.5" }
 
 # redis
-bb8-redis = { optional = true, version = "0.11.0" }
+bb8-redis = { optional = true, version = "0.11" }
 
 [features]
 redis = [
