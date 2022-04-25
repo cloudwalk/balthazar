@@ -5,7 +5,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{EnvFilter, Registry};
 use tracing_tree::HierarchicalLayer;
 
-use crate::{EnvironmentConfig, Feature, Parser, Result};
+use crate::{async_trait, EnvironmentConfig, Feature, Parser, Result};
 
 #[derive(Debug, Clone, Parser)]
 pub struct TracingConfig {
@@ -31,8 +31,9 @@ pub struct TracingConfig {
 #[derive(clap::Parser, Debug, Clone)]
 pub struct Tracing;
 
+#[async_trait]
 impl Feature for Tracing {
-    fn init(service_name: String, config: EnvironmentConfig) -> Result<Self> {
+    async fn init(service_name: &str, config: EnvironmentConfig) -> Result<Self> {
         std::env::set_var("RUST_LOG", &config.tracing.log_level);
 
         let telemetry = if config.tracing.disable_opentelemetry {
@@ -42,9 +43,11 @@ impl Feature for Tracing {
                 .with_collector_endpoint(&config.tracing.opentelemetry_endpoint)
                 .with_service_name(service_name)
                 .install_batch(opentelemetry::runtime::Tokio)?;
-            Some(tracing_opentelemetry::layer()
-                .with_tracked_inactivity(false)
-                .with_tracer(tracer))
+            Some(
+                tracing_opentelemetry::layer()
+                    .with_tracked_inactivity(false)
+                    .with_tracer(tracer),
+            )
         };
 
         // tracing_subscriber lib currently does not support dynamically adding layer to registry

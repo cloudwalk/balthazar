@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
-mod lang;
 mod core;
+mod lang;
 mod tracing;
 
 pub use crate::lang::sensitive_string::SensitiveString;
@@ -27,8 +27,9 @@ mod redis;
 pub use crate::redis::{Redis, RedisConfig};
 
 // Feature enablement
+#[async_trait]
 pub trait Feature {
-    fn init(service_name: String, config: EnvironmentConfig) -> Result<Self>
+    async fn init(service_name: &str, config: EnvironmentConfig) -> Result<Self>
     where
         Self: Sized;
 }
@@ -73,23 +74,23 @@ pub struct Config<T: Debug + Clone + Args> {
 }
 
 impl<T: Debug + Clone + Args> Config<T> {
-    pub async fn init(service_name: String) -> Result<Environment<T>> {
+    pub async fn init<S: AsRef<str>>(service_name: S) -> Result<Environment<T>> {
         let Self {
             project,
             environment,
         } = Self::parse();
 
-        core::Core::init(service_name.clone(), environment.clone())?;
+        core::Core::init(service_name.as_ref(), environment.clone()).await?;
 
         Ok(Environment {
-            service_name: service_name.clone(),
-            tracing: Tracing::init(service_name.clone(), environment.clone())?,
+            service_name: service_name.as_ref().to_string(),
+            tracing: Tracing::init(service_name.as_ref(), environment.clone()).await?,
 
             #[cfg(feature = "database")]
-            database: Database::init(service_name.clone(), environment.clone()).await?,
+            database: Database::init(service_name.as_ref(), environment.clone()).await?,
 
             #[cfg(feature = "redis")]
-            redis: Redis::init(service_name.clone(), environment.clone()).await?,
+            redis: Redis::init(service_name.as_ref(), environment.clone()).await?,
 
             config: Self {
                 project,

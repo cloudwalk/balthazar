@@ -1,12 +1,11 @@
+use std::ops::Deref;
+
 use crate::*;
 
 use bb8_redis::{
-    bb8::{self, Pool, RunError},
-    redis::AsyncCommands,
+    bb8::Pool,
     RedisConnectionManager,
 };
-
-use std::error::Error;
 
 #[derive(Debug, Clone, Parser)]
 pub struct RedisConfig {
@@ -19,20 +18,21 @@ pub struct RedisConfig {
 
 #[derive(Debug, Clone)]
 pub struct Redis {
-    pool: bb8::Pool<RedisConnectionManager>,
+    pool: Pool<RedisConnectionManager>,
 }
 
+#[async_trait]
 impl Feature for Redis {
-    pub async fn init(_service_name: String, config: EnvironmentConfig) -> Result<Self> {
+    async fn init(_service_name: &str, config: EnvironmentConfig) -> Result<Self> {
         let manager = RedisConnectionManager::new(config.redis.connection_string)?;
-        let connection_pool = bb8::Pool::builder().build(manager).await?;
+        let connection_pool = Pool::builder().build(manager).await?;
 
         Ok(Self { pool: connection_pool })
     }
 }
 
 impl Deref for Redis {
-    type Target = bb8::Pool<RedisConnectionManager>;
+    type Target = Pool<RedisConnectionManager>;
 
     fn deref(&self) -> &Self::Target {
         &self.pool                                    
