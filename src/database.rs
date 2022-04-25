@@ -18,7 +18,7 @@ pub struct Database {
     pool: Pool<Postgres>,
 }
 
-impl Database {
+impl Feature for Database {
     pub async fn init(_service_name: String, config: EnvironmentConfig) -> Result<Self> {
         Ok(Self {
             pool: PgPoolOptions::new()

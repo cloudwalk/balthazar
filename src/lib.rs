@@ -20,6 +20,12 @@ mod database;
 #[cfg(feature = "database")]
 pub use crate::database::{Database, DatabaseConfig};
 
+#[cfg(feature = "redis")]
+mod redis;
+
+#[cfg(feature = "redis")]
+pub use crate::redis::{Redis, RedisConfig};
+
 // Feature enablement
 pub trait Feature {
     fn init(service_name: String, config: EnvironmentConfig) -> Result<Self>
@@ -35,6 +41,9 @@ pub struct Environment<T: Debug + Clone + Args> {
 
     #[cfg(feature = "database")]
     pub database: Database,
+
+    #[cfg(feature = "redis")]
+    pub redis: Redis,
 }
 
 #[derive(Debug, Clone, Parser)]
@@ -48,6 +57,10 @@ pub struct EnvironmentConfig {
     #[cfg(feature = "database")]
     #[clap(flatten)]
     pub database: DatabaseConfig,
+
+    #[cfg(feature = "redis")]
+    #[clap(flatten)]
+    pub redis: RedisConfig,
 }
 
 #[derive(Debug, Clone, Parser)]
@@ -74,6 +87,9 @@ impl<T: Debug + Clone + Args> Config<T> {
 
             #[cfg(feature = "database")]
             database: Database::init(service_name.clone(), environment.clone()).await?,
+
+            #[cfg(feature = "redis")]
+            redis: Redis::init(service_name.clone(), environment.clone()).await?,
 
             config: Self {
                 project,
