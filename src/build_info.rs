@@ -1,5 +1,9 @@
 use serde::Serialize;
 
+/// Returns a struct with the current project build information (Rust, Cargo and Git).
+/// 
+/// To use this macro, a build.rs file must be configured using [Vergen default configuration](https://docs.rs/vergen/latest/vergen/#buildrs),
+/// otherwise the build wil fail because the required environment variables will not be present.
 #[macro_export]
 macro_rules! generate_build_info {
     () => {
