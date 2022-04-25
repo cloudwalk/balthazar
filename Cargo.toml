@@ -14,14 +14,21 @@ tracing = "0.1"
 tracing-opentelemetry = "0.17"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-tree = "0.2"
-
-postgres = { optional = true, version = "0.19" }
-sqlx = { optional = true, version = "0.5" }
 async-trait = "0.1.52"
 futures-util = "0.3.21"
 ethereum-types = "0.13.1"
 
+# database
+postgres = { optional = true, version = "0.19" }
+sqlx = { optional = true, version = "0.5" }
+
+# redis
+bb8-redis = { optional = true, version = "0.11.0" }
+
 [features]
+redis = [
+    "bb8-redis"
+]
 database = [
     "postgres",
     "sqlx",
