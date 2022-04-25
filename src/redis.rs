@@ -22,8 +22,9 @@ pub struct Redis {
     pool: bb8::Pool<RedisConnectionManager>,
 }
 
+#[async_trait]
 impl Feature for Redis {
-    pub async fn init(_service_name: String, config: EnvironmentConfig) -> Result<Self> {
+    async fn init(_service_name: String, config: EnvironmentConfig) -> Result<Self> {
         let manager = RedisConnectionManager::new(config.redis.connection_string)?;
         let connection_pool = bb8::Pool::builder().build(manager).await?;
 

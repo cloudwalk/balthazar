@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
-mod lang;
 mod core;
+mod lang;
 mod tracing;
 
 pub use crate::lang::sensitive_string::SensitiveString;
@@ -27,8 +27,9 @@ mod redis;
 pub use crate::redis::{Redis, RedisConfig};
 
 // Feature enablement
+#[async_trait]
 pub trait Feature {
-    fn init(service_name: String, config: EnvironmentConfig) -> Result<Self>
+    async fn init(service_name: String, config: EnvironmentConfig) -> Result<Self>
     where
         Self: Sized;
 }
@@ -79,11 +80,11 @@ impl<T: Debug + Clone + Args> Config<T> {
             environment,
         } = Self::parse();
 
-        core::Core::init(service_name.clone(), environment.clone())?;
+        core::Core::init(service_name.clone(), environment.clone()).await?;
 
         Ok(Environment {
             service_name: service_name.clone(),
-            tracing: Tracing::init(service_name.clone(), environment.clone())?,
+            tracing: Tracing::init(service_name.clone(), environment.clone()).await?,
 
             #[cfg(feature = "database")]
             database: Database::init(service_name.clone(), environment.clone()).await?,
