@@ -108,6 +108,7 @@ dependencies = [
  "opentelemetry",
  "opentelemetry-jaeger",
  "postgres",
+ "serde",
  "sqlx",
  "tokio",
  "tracing",

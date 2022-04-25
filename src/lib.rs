@@ -2,6 +2,7 @@ use std::fmt::Debug;
 
 mod lang;
 mod core;
+pub mod build_info;
 mod tracing;
 
 pub use crate::lang::sensitive_string::SensitiveString;
