@@ -6,7 +6,8 @@ such as telemetry and database access.
 
 ## Cargo Features
 
-* `database`: Enables PostgreSQL support with pooling, using sqlx.
+* `database`: Enables PostgreSQL support with pooling, using `sqlx`.
+* `redis`: Enables Redis support with pooling, using `bb8`.
 
 ## Environment Variables Reference
 
@@ -19,3 +20,4 @@ such as telemetry and database access.
 | `TRACING_FORMAT` | `pretty` | Set to `json` for JSON output, or `pretty` for colored terminal output. |
 | `DATABASE_URL` || Connection string for the PostgreSQL instance. |
 | `DATABASE_POOL_MAX_CONNECTIONS` |`8`| Maximum amount of concurrent connections to the SQL instance. |
+| `REDIS_CONNECTION_STRING` || Connection string to the Redis instance. |
