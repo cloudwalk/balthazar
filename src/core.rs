@@ -1,4 +1,4 @@
-use crate::{EnvironmentConfig, Feature, Parser, Result};
+use crate::*;
 
 #[derive(Debug, Clone, Parser)]
 pub struct CoreConfig {
@@ -8,8 +8,9 @@ pub struct CoreConfig {
 
 pub struct Core;
 
+#[crate::async_trait]
 impl Feature for Core {
-    fn init(_service_name: String, config: EnvironmentConfig) -> Result<Self> {
+    async fn init(_service_name: &str, config: EnvironmentConfig) -> Result<Self> {
         if !config.core.no_color {
             color_eyre::install()?;
         }
