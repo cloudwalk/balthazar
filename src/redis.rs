@@ -10,10 +10,10 @@ use bb8_redis::{
 #[derive(Debug, Clone, Parser)]
 pub struct RedisConfig {
     #[clap(
-        env = "REDIS_CONNECTION_STRING",
-        default_value = "redis://default:password@127.0.0.1:6379"
+        long = "redis-url",
+        env = "REDIS_URL"
     )]
-    pub connection_string: String,
+    pub url: String,
 }
 
 #[derive(Debug, Clone)]
@@ -24,7 +24,7 @@ pub struct Redis {
 #[async_trait]
 impl Feature for Redis {
     async fn init(_service_name: &str, config: EnvironmentConfig) -> Result<Self> {
-        let manager = RedisConnectionManager::new(config.redis.connection_string)?;
+        let manager = RedisConnectionManager::new(config.redis.url)?;
         let connection_pool = Pool::builder().build(manager).await?;
 
         Ok(Self { pool: connection_pool })

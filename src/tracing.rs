@@ -16,15 +16,25 @@ pub struct TracingConfig {
     pub disable_opentelemetry: bool,
 
     #[clap(
+        long = "tracing-opentelemetry-endpoint",
         env = "TRACING_OPENTELEMETRY_ENDPOINT",
         default_value = "http://localhost:14268/api/traces"
     )]
     pub opentelemetry_endpoint: String,
 
-    #[clap(env = "TRACING_LOG_LEVEL", default_value = "debug")]
+    #[clap(
+        long = "tracing-log-level",
+        env = "TRACING_LOG_LEVEL",
+        default_value = "debug"
+    )]
     pub log_level: String,
 
-    #[clap(arg_enum, env = "TRACING_FORMAT", default_value = "pretty")]
+    #[clap(
+        arg_enum,
+        long = "tracing-format",
+        env = "TRACING_FORMAT",
+        default_value = "pretty"
+    )]
     pub format: TracingFormat,
 }
 
