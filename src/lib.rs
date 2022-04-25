@@ -15,15 +15,13 @@ pub use eyre::Result;
 pub use futures_util::StreamExt;
 pub use tokio::{self, main};
 
-#[cfg(feature = "database")]
-mod database;
-
-#[cfg(feature = "database")]
-pub use crate::database::{Database, DatabaseConfig};
+#[cfg(feature = "postgres")]
+mod postgres;
+#[cfg(feature = "postgres")]
+pub use crate::postgres::{Postgres, PostgresConfig};
 
 #[cfg(feature = "redis")]
 mod redis;
-
 #[cfg(feature = "redis")]
 pub use crate::redis::{Redis, RedisConfig};
 
@@ -41,8 +39,8 @@ pub struct Environment<T: Debug + Clone + Args> {
     pub config: Config<T>,
     pub tracing: tracing::Tracing,
 
-    #[cfg(feature = "database")]
-    pub database: Database,
+    #[cfg(feature = "postgres")]
+    pub postgres: Postgres,
 
     #[cfg(feature = "redis")]
     pub redis: Redis,
@@ -56,9 +54,9 @@ pub struct EnvironmentConfig {
     #[clap(flatten)]
     pub tracing: tracing::TracingConfig,
 
-    #[cfg(feature = "database")]
+    #[cfg(feature = "postgres")]
     #[clap(flatten)]
-    pub database: DatabaseConfig,
+    pub postgres: PostgresConfig,
 
     #[cfg(feature = "redis")]
     #[clap(flatten)]
@@ -87,8 +85,8 @@ impl<T: Debug + Clone + Args> Config<T> {
             service_name: service_name.as_ref().to_string(),
             tracing: Tracing::init(service_name.as_ref(), environment.clone()).await?,
 
-            #[cfg(feature = "database")]
-            database: Database::init(service_name.as_ref(), environment.clone()).await?,
+            #[cfg(feature = "postgres")]
+            postgres: Postgres::init(service_name.as_ref(), environment.clone()).await?,
 
             #[cfg(feature = "redis")]
             redis: Redis::init(service_name.as_ref(), environment.clone()).await?,
