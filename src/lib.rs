@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 
+pub mod build_info;
 mod core;
 mod lang;
 mod tracing;
