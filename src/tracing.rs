@@ -33,7 +33,7 @@ pub struct Tracing;
 
 #[async_trait]
 impl Feature for Tracing {
-    async fn init(service_name: String, config: EnvironmentConfig) -> Result<Self> {
+    async fn init(service_name: &str, config: EnvironmentConfig) -> Result<Self> {
         std::env::set_var("RUST_LOG", &config.tracing.log_level);
 
         let telemetry = if config.tracing.disable_opentelemetry {

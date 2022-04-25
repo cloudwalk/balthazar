@@ -20,7 +20,7 @@ pub struct Database {
 
 #[crate::async_trait]
 impl Feature for Database {
-    async fn init(_service_name: String, config: EnvironmentConfig) -> Result<Self> {
+    async fn init(_service_name: &str, config: EnvironmentConfig) -> Result<Self> {
         Ok(Self {
             pool: PgPoolOptions::new()
                 .max_connections(config.database.pool_max_connections)
