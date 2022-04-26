@@ -3,10 +3,10 @@ use std::fmt::Debug;
 pub mod build_info;
 mod core;
 mod lang;
-mod tracing;
+mod trace;
 
 pub use crate::lang::sensitive_string::SensitiveString;
-pub use crate::tracing::{Tracing, TracingConfig};
+pub use crate::trace::{Tracing, TracingConfig};
 
 pub use async_trait::async_trait;
 pub use clap::{self, Args, Parser};
@@ -14,6 +14,7 @@ pub use ethereum_types::{H256, U256};
 pub use eyre::Result;
 pub use futures_util::StreamExt;
 pub use tokio::{self, main};
+pub use tracing::{self, debug, error, info, warn};
 
 #[cfg(feature = "postgres")]
 mod postgres;
@@ -37,7 +38,7 @@ pub trait Feature {
 pub struct Environment<T: Debug + Clone + Args> {
     pub service_name: String,
     pub config: Config<T>,
-    pub tracing: tracing::Tracing,
+    pub tracing: Tracing,
 
     #[cfg(feature = "postgres")]
     pub postgres: Postgres,
@@ -52,7 +53,7 @@ pub struct EnvironmentConfig {
     pub core: core::CoreConfig,
 
     #[clap(flatten)]
-    pub tracing: tracing::TracingConfig,
+    pub tracing: TracingConfig,
 
     #[cfg(feature = "postgres")]
     #[clap(flatten)]
