@@ -4,6 +4,8 @@
 ///
 /// Access to the original value can be obtained by derefing the SensitiveString to a String reference.
 pub(crate) mod sensitive_string {
+    use serde::{Deserialize, Serialize};
+
     use std::convert::Infallible;
     use std::fmt::{Debug, Display, Formatter};
     use std::ops::Deref;
@@ -11,7 +13,7 @@ pub(crate) mod sensitive_string {
 
     const MASK: &str = "******";
 
-    #[derive(Clone)]
+    #[derive(Clone, Serialize, Deserialize)]
     pub struct SensitiveString(String);
 
     impl Display for SensitiveString {
@@ -22,10 +24,7 @@ pub(crate) mod sensitive_string {
 
     impl Debug for SensitiveString {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-            f
-                .debug_tuple("SensitiveString")
-                .field(&MASK)
-                .finish()
+            f.debug_tuple("SensitiveString").field(&MASK).finish()
         }
     }
 
@@ -57,7 +56,10 @@ pub(crate) mod sensitive_string {
             // test it hides the content when displaying and debugging
             assert_eq!(sensitive.to_string(), MASK);
             assert_eq!(format!("{}", sensitive), MASK);
-            assert_eq!(format!("{:?}", sensitive), format!("SensitiveString(\"{}\")", MASK));
+            assert_eq!(
+                format!("{:?}", sensitive),
+                format!("SensitiveString(\"{}\")", MASK)
+            );
 
             // test it allows access to the secret string when requested
             let sensitive_deref: &str = &sensitive;

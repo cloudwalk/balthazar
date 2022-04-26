@@ -10,7 +10,8 @@ eyre = "0.6"
 tokio = { version = "1.17", features = ["rt-multi-thread", "macros", "tracing", "signal"] }
 opentelemetry = { version = "0.17", features = ["rt-tokio"] }
 opentelemetry-jaeger = { version = "0.16", features = ["rt-tokio", "collector_client", "reqwest_collector_client"] }
-serde = { version = "1.0.136", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+uuid = { version = "1.0", features = ["serde"] }
 tracing = "0.1"
 tracing-opentelemetry = "0.17"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }

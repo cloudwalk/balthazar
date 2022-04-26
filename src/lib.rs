@@ -13,6 +13,7 @@ pub use clap::{self, Args, Parser};
 pub use ethereum_types::{H256, U256};
 pub use eyre::Result;
 pub use futures_util::StreamExt;
+pub use serde::{Deserialize, Serialize};
 pub use tokio::{self, main};
 pub use tracing::{self, debug, error, info, warn};
 
