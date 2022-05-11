@@ -3,7 +3,7 @@
 /// the original value and overriding Display and Debug traits.
 ///
 /// Access to the original value can be obtained by derefing the SensitiveString to a String reference.
-pub(crate) mod sensitive {
+pub mod sensitive {
     use serde::{Deserialize, Serialize};
 
     use std::fmt::{Debug, Display, Formatter};
