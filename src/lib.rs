@@ -5,7 +5,8 @@ mod core;
 mod lang;
 mod trace;
 
-pub use crate::lang::sensitive_string::SensitiveString;
+#[allow(deprecated)]
+pub use crate::lang::sensitive::{Sensitive,SensitiveString};
 pub use crate::trace::{Tracing, TracingConfig};
 
 pub use async_trait::async_trait;
