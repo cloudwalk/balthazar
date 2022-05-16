@@ -15,6 +15,12 @@ pub mod sensitive {
     #[derive(Clone, Serialize, Deserialize)]
     pub struct Sensitive<T>(T);
 
+    impl<T> Sensitive<T> {
+        pub fn new(value: T) -> Self {
+            Self(value)
+        }
+    }
+
     impl<T> Display for Sensitive<T> {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
             write!(f, "{}", MASK)
