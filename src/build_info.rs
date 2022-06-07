@@ -21,6 +21,7 @@ macro_rules! generate_build_info {
                 commit_author_name: env!("VERGEN_GIT_COMMIT_AUTHOR_NAME")
                 commit_datetime: env!("VERGEN_GIT_COMMIT_TIMESTAMP"),
                 commit_hash: env!("VERGEN_GIT_SHA"),
+                commit_message: env!("VERGEN_GIT_COMMIT_MESSAGE"),
             },
         }
     }
@@ -48,4 +49,5 @@ pub struct GitInfo {
     pub commit_author_name: &'static str,
     pub commit_hash: &'static str,
     pub commit_datetime: &'static str,
+    pub commit_message: &'static str,
 }
