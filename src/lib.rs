@@ -7,7 +7,8 @@ mod trace;
 
 #[allow(deprecated)]
 pub use crate::lang::sensitive::{Sensitive,SensitiveString};
-pub use crate::trace::{Tracing, TracingConfig};
+pub use crate::trace::{Tracing, TracingConfig, TracingFormat};
+pub use crate::core::CoreConfig;
 
 pub use async_trait::async_trait;
 pub use clap::{self, Args, Parser};
