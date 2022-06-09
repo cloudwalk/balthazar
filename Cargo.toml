@@ -22,6 +22,7 @@ tracing-opentelemetry = "0.17"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-tree = "0.2"
 uuid = { version = "1.0", features = ["serde", "v4"] }
+vergen = { version = "7.2.1" }
 
 # database
 sqlx = { optional = true, version = "0.5" }
