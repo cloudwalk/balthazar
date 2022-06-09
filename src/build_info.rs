@@ -10,18 +10,18 @@ macro_rules! generate_build_info {
         balthazar::build_info::BuildInfo {
             datetime: env!("VERGEN_BUILD_TIMESTAMP"),
             rust: balthazar::build_info::RustInfo {
-                version: env!("VERGEN_RUSTC_SEMVER"),
-                platform: env!("VERGEN_CARGO_TARGET_TRIPLE"),
-                profile: env!("VERGEN_CARGO_PROFILE"),
-                features: env!("VERGEN_CARGO_FEATURES"),
+                version: option_env!("VERGEN_RUSTC_SEMVER").unwrap_or(""),
+                platform: option_env!("VERGEN_CARGO_TARGET_TRIPLE").unwrap_or(""),
+                profile: option_env!("VERGEN_CARGO_PROFILE").unwrap_or(""),
+                features: option_env!("VERGEN_CARGO_FEATURES").unwrap_or(""),
             },
             git: balthazar::build_info::GitInfo {
-                branch: env!("VERGEN_GIT_BRANCH"),
-                commit_author_email: env!("VERGEN_GIT_COMMIT_AUTHOR_EMAIL")
-                commit_author_name: env!("VERGEN_GIT_COMMIT_AUTHOR_NAME")
-                commit_datetime: env!("VERGEN_GIT_COMMIT_TIMESTAMP"),
-                commit_hash: env!("VERGEN_GIT_SHA"),
-                commit_message: env!("VERGEN_GIT_COMMIT_MESSAGE"),
+                branch: option_env!("VERGEN_GIT_BRANCH").unwrap_or(""),
+                commit_author_email: option_env!("VERGEN_GIT_COMMIT_AUTHOR_EMAIL").unwrap_or(""),
+                commit_author_name: option_env!("VERGEN_GIT_COMMIT_AUTHOR_NAME").unwrap_or(""),
+                commit_datetime: option_env!("VERGEN_GIT_COMMIT_TIMESTAMP").unwrap_or(""),
+                commit_hash: option_env!("VERGEN_GIT_SHA").unwrap_or(""),
+                commit_message: option_env!("VERGEN_GIT_COMMIT_MESSAGE").unwrap_or(""),
             },
         }
     }
