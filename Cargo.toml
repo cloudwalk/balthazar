@@ -14,6 +14,7 @@ opentelemetry = { version = "0.17", features = ["rt-tokio"] }
 opentelemetry-jaeger = { version = "0.16", features = ["rt-tokio", "collector_client", "reqwest_collector_client"] }
 quickcheck = "1.0"
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.81"
 strum = { version = "0.24", features = ["derive"] }
 time = { version = "0.3", features = ["quickcheck", "serde", "serde-well-known"] }
 tokio = { version = "1.17", features = ["rt-multi-thread", "macros", "tracing", "signal"] }
