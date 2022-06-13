@@ -1,15 +1,16 @@
+use chrono::{DateTime, SecondsFormat, Utc};
+use serde::Serialize;
+use serde_json::Value;
 use std::fmt::Debug;
 use tracing::{Event, Subscriber};
 use tracing_opentelemetry::OtelData;
+use tracing_subscriber::fmt::format::{DefaultFields, Writer};
 use tracing_subscriber::fmt::{FmtContext, FormatEvent, Layer};
-use tracing_subscriber::layer::{SubscriberExt};
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::registry::LookupSpan;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{EnvFilter, Registry};
-use tracing_subscriber::fmt::format::{DefaultFields, Writer};
-use tracing_subscriber::registry::LookupSpan;
 use tracing_tree::HierarchicalLayer;
-use serde_json::Value;
-use serde::Serialize;
 
 use crate::{async_trait, EnvironmentConfig, Feature, Parser, Result};
 
@@ -96,11 +97,17 @@ impl Feature for Tracing {
         let (layer_format_json, layer_format_pretty, layer_format_hierarchical) =
             match config.tracing.format {
                 TracingFormat::None => (None, None, None),
-                TracingFormat::Json => (Some(Layer::default().event_format(JsonFormatter)), None, None),
+                TracingFormat::Json => (
+                    Some(Layer::default().event_format(JsonFormatter)),
+                    None,
+                    None,
+                ),
+                //TracingFormat::Json => (Some(Layer::default().json()), None, None),
                 TracingFormat::Pretty => (
                     None,
                     Some(
-                        Layer::default().json()
+                        Layer::default()
+                            .json()
                             .pretty()
                             .with_thread_ids(true)
                             .with_thread_names(true)
@@ -147,94 +154,132 @@ impl Drop for Tracing {
 // -----------------------------------------------------------------------------
 // Json Formatter
 // -----------------------------------------------------------------------------
-const CONTEXT_TO_IGNORE: [&str;5] = ["code.filepath", "code.lineno", "code.namespace","thread.id", "thread.name"];
-const FIELDS_TO_IGNORE: [&str;6] = ["code.filepath", "code.lineno", "code.namespace", "level", "name", "target"];
+const CONTEXT_FIELDS_TO_IGNORE: [&str; 5] = [
+    "code.filepath",
+    "code.lineno",
+    "code.namespace",
+    "thread.id",
+    "thread.name",
+];
+const EVENT_FIELDS_TO_IGNORE: [&str; 6] = [
+    "code.filepath",
+    "code.lineno",
+    "code.namespace",
+    "level",
+    "name",
+    "target",
+];
 
 struct JsonFormatter;
 
 impl<S> FormatEvent<S, DefaultFields> for JsonFormatter
-    where
-        S: Subscriber + for<'lookup> LookupSpan<'lookup>
+where
+    S: Subscriber + for<'lookup> LookupSpan<'lookup>,
 {
-    fn format_event(&self, ctx: &FmtContext<'_, S, DefaultFields>, mut writer: Writer<'_>, event: &Event<'_>) -> std::fmt::Result {
+    fn format_event(
+        &self,
+        ctx: &FmtContext<'_, S, DefaultFields>,
+        mut writer: Writer<'_>,
+        event: &Event<'_>,
+    ) -> std::fmt::Result {
         // ---------------------------------------------------------------------
-        // 0 - retrieve current span
+        // 0 - retrieve current span and track global data
         // ---------------------------------------------------------------------
-        // retrieve current span
         let current_span = match ctx.lookup_current() {
             Some(span) => span,
-            None => return Ok(())
+            None => return Ok(()),
         };
+        let mut current_event: Option<opentelemetry::trace::Event> = None;
+        let mut current_event_thread_id: String = "".to_string();
+        let mut current_event_thread_name: String = "".to_string();
 
         // ---------------------------------------------------------------------
-        // 1 - prepare context
+        // 1 - visit context attributes
         // ---------------------------------------------------------------------
         // iterate spans aggregating all context data
         let mut log_context = serde_json::Map::default();
-        let mut current_event: Option<opentelemetry::trace::Event> = None;
         for span in current_span.scope().from_root() {
-            // clear current event
+            // clear current event data
             current_event = None;
 
-            // retrieve span data
+            // retrieve current span data
             let span_ext = span.extensions();
             let span_data = match span_ext.get::<OtelData>() {
                 Some(data) => data,
-                None => continue
+                None => continue,
             };
             let span_attrs = match &span_data.builder.attributes {
                 Some(attrs) => attrs,
-                None => continue
+                None => continue,
             };
 
-            // populate dynamic data
+            // keep track of the last visited span data after the loop exits
+            current_event = match &span_data.builder.events {
+                Some(events) => events.last().map(|it| it.clone()),
+                None => None,
+            };
+
+            // populate context data
             for span_attr in span_attrs {
                 let key = span_attr.key.to_string();
-                if CONTEXT_TO_IGNORE.contains(&key.as_str())  {
+                if key == "thread.id" {
+                    current_event_thread_id = span_attr.value.to_string();
+                }
+                if key == "thread.name" {
+                    current_event_thread_name = span_attr.value.to_string();
+                }
+                if CONTEXT_FIELDS_TO_IGNORE.contains(&key.as_str()) {
                     continue;
                 }
                 let value_wrapper = OpenTelemetryValue(span_attr.value.clone());
                 log_context.insert(key, value_wrapper.into());
             }
-
-            // keep track of current event
-            current_event = match &span_data.builder.events {
-                Some(events) => events.last().map(|it| it.clone()),
-                None => None
-            }
         }
 
         // ---------------------------------------------------------------------
-        // 2 - prepare event
+        // 2 - check has en event
         // ---------------------------------------------------------------------
-        let log_message: String;
-        let mut log_fields = serde_json::Map::default();
-        match current_event {
-            Some(current_event) => {
-                for event_attr in &current_event.attributes {
-                    let key = event_attr.key.to_string();
-                    if FIELDS_TO_IGNORE.contains(&key.as_str())  {
-                        continue;
-                    }
-                    let value_wrapper = OpenTelemetryValue(event_attr.value.clone());
-                    log_fields.insert(key, value_wrapper.into());
-                }
-                log_message = current_event.name.to_string();
-            },
-            // if no event, nothing to log
-            None => return Ok(())
-        }
-
-        // ---------------------------------------------------------------------
-        // 3 - prepare log message
-        // ---------------------------------------------------------------------
-        let message = LogMessage {
-            message: log_message,
-            fields: Value::Object(log_fields),
-            context: Value::Object(log_context)
+        let current_event = match current_event {
+            Some(event) => event,
+            None => return Ok(()),
         };
 
-        // output log message
+        // ---------------------------------------------------------------------
+        // 3 - visit event attributes
+        // ---------------------------------------------------------------------
+        let mut log_fields = serde_json::Map::default();
+        for event in current_event.attributes {
+            let key = event.key.to_string();
+            if EVENT_FIELDS_TO_IGNORE.contains(&key.as_str()) {
+                continue;
+            }
+            let value_wrapper = OpenTelemetryValue(event.value.clone());
+            log_fields.insert(key.to_string(), value_wrapper.into());
+        }
+
+        // ---------------------------------------------------------------------
+        // 4 - prepare log message
+        // ---------------------------------------------------------------------
+        let timestamp: DateTime<Utc> = current_event.timestamp.into();
+        let message = LogMessage {
+            level: event.metadata().level().to_string(),
+            timestamp: timestamp.to_rfc3339_opts(SecondsFormat::Millis, true),
+            module: event.metadata().target().to_string(),
+            file: event.metadata().file().map(|it| it.to_string()),
+            line: event.metadata().line(),
+            span: current_span.metadata().name().to_string(),
+
+            thread_id: current_event_thread_id.to_string(),
+            thread_name: current_event_thread_name.to_string(),
+
+            message: current_event.name.to_string(),
+            fields: Value::Object(log_fields),
+            context: Value::Object(log_context),
+        };
+
+        // ---------------------------------------------------------------------
+        // 4 - output log message
+        // ---------------------------------------------------------------------
         let message_as_json = serde_json::to_string_pretty(&message).unwrap();
         let _ = write!(writer, "{}\n", message_as_json);
 
@@ -244,9 +289,21 @@ impl<S> FormatEvent<S, DefaultFields> for JsonFormatter
 
 #[derive(Debug, Serialize)]
 struct LogMessage {
+    level: String,
+    timestamp: String,
+
+    module: String,
+    file: Option<String>,
+    line: Option<u32>,
+    span: String,
+
+    thread_id: String,
+    thread_name: String,
+
     message: String,
     fields: Value,
-    context: Value
+
+    context: Value,
 }
 
 // -----------------------------------------------------------------------------
