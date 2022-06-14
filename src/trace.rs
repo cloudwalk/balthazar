@@ -2,8 +2,11 @@ use chrono::{DateTime, SecondsFormat, Utc};
 use serde::Serialize;
 use serde_json::Value;
 use std::fmt::Debug;
+use std::thread;
+use std::time::SystemTime;
 use tracing::{Event, Subscriber};
 use tracing_opentelemetry::OtelData;
+use tracing_serde::fields::AsMap;
 use tracing_subscriber::fmt::format::{DefaultFields, Writer};
 use tracing_subscriber::fmt::{FmtContext, FormatEvent, Layer};
 use tracing_subscriber::layer::SubscriberExt;
@@ -102,12 +105,10 @@ impl Feature for Tracing {
                     None,
                     None,
                 ),
-                //TracingFormat::Json => (Some(Layer::default().json()), None, None),
                 TracingFormat::Pretty => (
                     None,
                     Some(
                         Layer::default()
-                            .json()
                             .pretty()
                             .with_thread_ids(true)
                             .with_thread_names(true)
@@ -179,7 +180,7 @@ where
     fn format_event(
         &self,
         ctx: &FmtContext<'_, S, DefaultFields>,
-        mut writer: Writer<'_>,
+        writer: Writer<'_>,
         event: &Event<'_>,
     ) -> std::fmt::Result {
         // ---------------------------------------------------------------------
@@ -187,102 +188,122 @@ where
         // ---------------------------------------------------------------------
         let current_span = match ctx.lookup_current() {
             Some(span) => span,
-            None => return Ok(()),
+            None => {
+                log_without_context(writer, event);
+                return Ok(());
+            }
         };
-        let mut current_event: Option<opentelemetry::trace::Event> = None;
-        let mut current_event_thread_id: String = "".to_string();
-        let mut current_event_thread_name: String = "".to_string();
+        let mut ot_event: Option<opentelemetry::trace::Event> = None;
+        let mut field_thread_id: String = "".to_string();
+        let mut field_thread_name: String = "".to_string();
 
         // ---------------------------------------------------------------------
         // 1 - visit context attributes
         // ---------------------------------------------------------------------
-        // iterate spans aggregating all context data
-        let mut log_context = serde_json::Map::default();
-        for span in current_span.scope().from_root() {
-            // clear current event data
-            current_event = None;
-
-            // retrieve current span data
+        // iterate spans aggregating all context data from several spans in a single map
+        // iteration is performed from lower level span (current) to higher level span (root)
+        let mut is_first_span = true;
+        let mut field_context = serde_json::Map::default();
+        for span in current_span.scope() {
+            // 1.1 - retrieve span data
             let span_ext = span.extensions();
             let span_data = match span_ext.get::<OtelData>() {
                 Some(data) => data,
-                None => continue,
+                None => {
+                    is_first_span = false;
+                    continue;
+                }
             };
+
+            // 1.2 - keep track of current event for use after the iteration
+            if is_first_span {
+                ot_event = match &span_data.builder.events {
+                    Some(events) => events.last().cloned(),
+                    None => None,
+                };
+            }
+
+            // 1.3 - retrieve span attributes
             let span_attrs = match &span_data.builder.attributes {
                 Some(attrs) => attrs,
-                None => continue,
+                None => {
+                    is_first_span = false;
+                    continue;
+                }
             };
 
-            // keep track of the last visited span data after the loop exits
-            current_event = match &span_data.builder.events {
-                Some(events) => events.last().map(|it| it.clone()),
-                None => None,
-            };
-
-            // populate context data
+            // 1.4 - populate context data
             for span_attr in span_attrs {
+                // parse key
                 let key = span_attr.key.to_string();
-                if key == "thread.id" {
-                    current_event_thread_id = span_attr.value.to_string();
+
+                // track thread
+                if is_first_span && key == "thread.id" {
+                    field_thread_id = span_attr.value.to_string();
                 }
-                if key == "thread.name" {
-                    current_event_thread_name = span_attr.value.to_string();
+                if is_first_span && key == "thread.name" {
+                    field_thread_name = span_attr.value.to_string();
                 }
+
+                // check ignored fields
                 if CONTEXT_FIELDS_TO_IGNORE.contains(&key.as_str()) {
                     continue;
                 }
+
+                // add attr to context if not already present because lower level attrs
+                // have precedence over higher level attrs if they have the same name
                 let value_wrapper = OpenTelemetryValue(span_attr.value.clone());
-                log_context.insert(key, value_wrapper.into());
+                if !field_context.contains_key(&key) {
+                    field_context.insert(key, value_wrapper.into());
+                }
             }
+            is_first_span = false;
         }
 
         // ---------------------------------------------------------------------
-        // 2 - check has en event
+        // 2 - ensure has en event
         // ---------------------------------------------------------------------
-        let current_event = match current_event {
+        let ot_event = match ot_event {
             Some(event) => event,
-            None => return Ok(()),
+            None => {
+                // unlikely to happen because if it has a span, it will have an event because this
+                // function is called only when event exists
+                log_without_context(writer, event);
+                return Ok(());
+            }
         };
 
         // ---------------------------------------------------------------------
         // 3 - visit event attributes
         // ---------------------------------------------------------------------
-        let mut log_fields = serde_json::Map::default();
-        for event in current_event.attributes {
+        let mut field_fields = serde_json::Map::default();
+        for event in &ot_event.attributes {
+            // parse key
             let key = event.key.to_string();
+
+            // check ignored fields
             if EVENT_FIELDS_TO_IGNORE.contains(&key.as_str()) {
                 continue;
             }
+
+            // add event attr to context
             let value_wrapper = OpenTelemetryValue(event.value.clone());
-            log_fields.insert(key.to_string(), value_wrapper.into());
+            field_fields.insert(key.to_string(), value_wrapper.into());
         }
-
-        // ---------------------------------------------------------------------
-        // 4 - prepare log message
-        // ---------------------------------------------------------------------
-        let timestamp: DateTime<Utc> = current_event.timestamp.into();
-        let message = LogMessage {
-            level: event.metadata().level().to_string(),
-            timestamp: timestamp.to_rfc3339_opts(SecondsFormat::Millis, true),
-            module: event.metadata().target().to_string(),
-            file: event.metadata().file().map(|it| it.to_string()),
-            line: event.metadata().line(),
-            span: current_span.metadata().name().to_string(),
-
-            thread_id: current_event_thread_id.to_string(),
-            thread_name: current_event_thread_name.to_string(),
-
-            message: current_event.name.to_string(),
-            fields: Value::Object(log_fields),
-            context: Value::Object(log_context),
-        };
 
         // ---------------------------------------------------------------------
         // 4 - output log message
         // ---------------------------------------------------------------------
-        let message_as_json = serde_json::to_string_pretty(&message).unwrap();
-        let _ = write!(writer, "{}\n", message_as_json);
-
+        log_with_context(
+            writer,
+            event,
+            ot_event,
+            field_context,
+            field_fields,
+            current_span.name().into(),
+            field_thread_id,
+            field_thread_name,
+        );
         Ok(())
     }
 }
@@ -292,7 +313,7 @@ struct LogMessage {
     level: String,
     timestamp: String,
 
-    module: String,
+    target: String,
     file: Option<String>,
     line: Option<u32>,
     span: String,
@@ -304,6 +325,92 @@ struct LogMessage {
     fields: Value,
 
     context: Value,
+}
+
+fn log_without_context(writer: Writer<'_>, event: &Event) {
+    // extract fields from event
+    let event_fields = event.field_map();
+    let mut event_fields_as_value = match serde_json::to_value(&event_fields) {
+        Ok(v) => v,
+        Err(_) => return, // unlikely to happen, so just ignore it for now
+    };
+
+    // parse fields from alternative sources
+    let field_timestamp: DateTime<Utc> = SystemTime::now().into();
+    let field_thread_name = thread::current()
+        .name()
+        .map(|it| it.to_string())
+        .unwrap_or_default();
+    let field_message = event_fields_as_value
+        .get("message")
+        .and_then(|it| it.as_str())
+        .map(|it| it.to_string())
+        .unwrap_or_default();
+
+    // remove message from event fields because it is special and will go to a separe attribute
+    if let Some(obj) = event_fields_as_value.as_object_mut() {
+        obj.remove("message");
+    }
+
+    let message = LogMessage {
+        level: event.metadata().level().to_string(),
+        timestamp: field_timestamp.to_rfc3339_opts(SecondsFormat::Millis, true),
+        target: event.metadata().target().to_string(),
+        file: event.metadata().file().map(|it| it.to_string()),
+        line: event.metadata().line(),
+        span: "".to_string(),
+
+        thread_id: "".to_string(),
+        thread_name: field_thread_name,
+
+        message: field_message,
+        fields: Value::Object(
+            event_fields_as_value
+                .as_object()
+                .cloned()
+                .unwrap_or_default(),
+        ),
+        context: Value::Object(serde_json::Map::default()),
+    };
+
+    log(writer, message);
+}
+
+#[allow(clippy::too_many_arguments)]
+fn log_with_context(
+    writer: Writer<'_>,
+    event: &Event,
+    ot_event: opentelemetry::trace::Event,
+    field_context: serde_json::Map<String, Value>,
+    field_fields: serde_json::Map<String, Value>,
+    field_span: String,
+    field_thread_id: String,
+    field_thread_name: String,
+) {
+    let field_timestamp: DateTime<Utc> = ot_event.timestamp.into();
+    let message = LogMessage {
+        level: event.metadata().level().to_string(),
+        timestamp: field_timestamp.to_rfc3339_opts(SecondsFormat::Millis, true),
+        target: event.metadata().target().to_string(),
+        file: event.metadata().file().map(|it| it.to_string()),
+        line: event.metadata().line(),
+        span: field_span,
+
+        thread_id: field_thread_id,
+        thread_name: field_thread_name,
+
+        message: ot_event.name.to_string(),
+        fields: Value::Object(field_fields),
+        context: Value::Object(field_context),
+    };
+
+    log(writer, message);
+}
+
+fn log(mut writer: Writer<'_>, message: LogMessage) {
+    if let Ok(message_as_json) = serde_json::to_string(&message) {
+        let _ = write!(writer, "{}\n", message_as_json);
+    }
 }
 
 // -----------------------------------------------------------------------------
