@@ -301,7 +301,7 @@ impl JsonFormatter {
     }
 
     fn log(&self, mut writer: Writer<'_>, message: LogMessage) {
-        if let Ok(message_as_json) = serde_json::to_string_pretty(&message) {
+        if let Ok(message_as_json) = serde_json::to_string(&message) {
             let _ = writeln!(writer, "{}", message_as_json);
         }
     }
