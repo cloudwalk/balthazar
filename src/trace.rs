@@ -97,39 +97,41 @@ impl Feature for Tracing {
         //
         // the workaround consists of passing a optional of Layer to every conditional layer,
         // so if Some(layer) is passed, that layer is active, if None the layer is inactive.
-        let (layer_format_json, layer_format_pretty, layer_format_hierarchical) =
-            match config.tracing.format {
-                TracingFormat::None => (None, None, None),
-                TracingFormat::Json => (
-                    Some(Layer::default().event_format(JsonFormatter)),
-                    None,
-                    None,
+        let (layer_format_json, layer_format_pretty, layer_format_hierarchical) = match config
+            .tracing
+            .format
+        {
+            TracingFormat::None => (None, None, None),
+            TracingFormat::Json => (
+                Some(Layer::default().event_format(JsonFormatter::new(service_name.to_string()))),
+                None,
+                None,
+            ),
+            TracingFormat::Pretty => (
+                None,
+                Some(
+                    Layer::default()
+                        .pretty()
+                        .with_thread_ids(true)
+                        .with_thread_names(true)
+                        .with_target(true)
+                        .with_file(true)
+                        .with_line_number(true)
+                        .with_ansi(!config.core.no_color),
                 ),
-                TracingFormat::Pretty => (
-                    None,
-                    Some(
-                        Layer::default()
-                            .pretty()
-                            .with_thread_ids(true)
-                            .with_thread_names(true)
-                            .with_target(true)
-                            .with_file(true)
-                            .with_line_number(true)
-                            .with_ansi(!config.core.no_color),
-                    ),
-                    None,
+                None,
+            ),
+            TracingFormat::Hierarchical => (
+                None,
+                None,
+                Some(
+                    HierarchicalLayer::new(2)
+                        .with_targets(true)
+                        .with_bracketed_fields(true)
+                        .with_ansi(!config.core.no_color),
                 ),
-                TracingFormat::Hierarchical => (
-                    None,
-                    None,
-                    Some(
-                        HierarchicalLayer::new(2)
-                            .with_targets(true)
-                            .with_bracketed_fields(true)
-                            .with_ansi(!config.core.no_color),
-                    ),
-                ),
-            };
+            ),
+        };
 
         Registry::default()
             .with(EnvFilter::from_default_env())
@@ -171,7 +173,139 @@ const EVENT_FIELDS_TO_IGNORE: [&str; 6] = [
     "target",
 ];
 
-struct JsonFormatter;
+struct JsonFormatter {
+    service_name: String,
+}
+
+impl JsonFormatter {
+    fn new(service_name: String) -> Self {
+        Self { service_name }
+    }
+
+    fn parse_from_service(&self, target: &str) -> bool {
+        target.to_string().starts_with(&self.service_name)
+    }
+
+    fn parse_simple_name(&self, name: String) -> String {
+        name.split("::")
+            .map(|it| it.to_string())
+            .last()
+            .unwrap_or_else(|| name.clone())
+    }
+
+    fn log_without_context(&self, writer: Writer<'_>, event: &Event) {
+        // extract fields from event
+        let event_fields = event.field_map();
+        let mut event_fields_as_value = match serde_json::to_value(&event_fields) {
+            Ok(v) => v,
+            Err(_) => return, // unlikely to happen, so just ignore it for now
+        };
+
+        // parse fields from alternative sources
+        let field_timestamp: DateTime<Utc> = SystemTime::now().into();
+
+        let field_target = event.metadata().target().to_string();
+
+        let field_thread_name = thread::current()
+            .name()
+            .map(|it| it.to_string())
+            .unwrap_or_default();
+
+        let field_message = event_fields_as_value
+            .get("message")
+            .and_then(|it| it.as_str())
+            .map(|it| it.to_string())
+            .unwrap_or_default();
+
+        // remove message from event fields because it is special and will go to a separe attribute
+        if let Some(obj) = event_fields_as_value.as_object_mut() {
+            obj.remove("message");
+        }
+
+        let log_message = LogMessage {
+            from_service: self.parse_from_service(&field_target),
+
+            level: event.metadata().level().to_string(),
+            timestamp: field_timestamp.to_rfc3339_opts(SecondsFormat::Millis, true),
+
+            target: field_target.clone(),
+            target_simple: self.parse_simple_name(field_target),
+
+            file: event.metadata().file().map(|it| it.to_string()),
+            line: event.metadata().line(),
+
+            thread_id: "".to_string(),
+            thread_name: field_thread_name,
+
+            current_span_simple: "".to_string(),
+            current_span: "".to_string(),
+
+            root_span_simple: "".to_string(),
+            root_span: "".to_string(),
+
+            message: field_message,
+            fields: Value::Object(
+                event_fields_as_value
+                    .as_object()
+                    .cloned()
+                    .unwrap_or_default(),
+            ),
+            context: Value::Object(serde_json::Map::default()),
+        };
+
+        self.log(writer, log_message);
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn log_with_context(
+        &self,
+        writer: Writer<'_>,
+        event: &Event,
+        ot_event: opentelemetry::trace::Event,
+        field_context: serde_json::Map<String, Value>,
+        field_fields: serde_json::Map<String, Value>,
+        field_root_span_name: String,
+        field_current_span_name: String,
+        field_thread_id: String,
+        field_thread_name: String,
+    ) {
+        let field_timestamp: DateTime<Utc> = ot_event.timestamp.into();
+        let field_target = event.metadata().target().to_string();
+        let message = LogMessage {
+            from_service: self.parse_from_service(&field_target),
+
+            level: event.metadata().level().to_string(),
+            timestamp: field_timestamp.to_rfc3339_opts(SecondsFormat::Millis, true),
+
+            target: field_target.clone(),
+            target_simple: self.parse_simple_name(field_target),
+
+            file: event.metadata().file().map(|it| it.to_string()),
+            line: event.metadata().line(),
+
+            thread_id: field_thread_id,
+            thread_name: field_thread_name,
+
+            root_span: field_root_span_name.clone(),
+            root_span_simple: self.parse_simple_name(field_root_span_name),
+
+            current_span: field_current_span_name.clone(),
+            current_span_simple: self.parse_simple_name(field_current_span_name),
+
+            message: ot_event.name.to_string(),
+            fields: Value::Object(field_fields),
+            context: Value::Object(field_context),
+        };
+
+        self.log(writer, message);
+    }
+
+    fn log(&self, mut writer: Writer<'_>, message: LogMessage) {
+        if let Ok(message_as_json) = serde_json::to_string_pretty(&message) {
+            let _ = writeln!(writer, "{}", message_as_json);
+        }
+    }
+}
 
 impl<S> FormatEvent<S, DefaultFields> for JsonFormatter
 where
@@ -189,7 +323,7 @@ where
         let current_span = match ctx.lookup_current() {
             Some(span) => span,
             None => {
-                log_without_context(writer, event);
+                self.log_without_context(writer, event);
                 return Ok(());
             }
         };
@@ -271,7 +405,7 @@ where
             None => {
                 // unlikely to happen because if it has a span, it will have an event because this
                 // function is called only when event exists
-                log_without_context(writer, event);
+                self.log_without_context(writer, event);
                 return Ok(());
             }
         };
@@ -297,7 +431,7 @@ where
         // ---------------------------------------------------------------------
         // 4 - output log message
         // ---------------------------------------------------------------------
-        log_with_context(
+        self.log_with_context(
             writer,
             event,
             ot_event,
@@ -314,6 +448,8 @@ where
 
 #[derive(Debug, Serialize)]
 struct LogMessage {
+    from_service: bool,
+
     level: String,
     timestamp: String,
 
@@ -334,134 +470,6 @@ struct LogMessage {
     message: String,
     fields: Value,
     context: Value,
-}
-
-fn log_without_context(writer: Writer<'_>, event: &Event) {
-    // extract fields from event
-    let event_fields = event.field_map();
-    let mut event_fields_as_value = match serde_json::to_value(&event_fields) {
-        Ok(v) => v,
-        Err(_) => return, // unlikely to happen, so just ignore it for now
-    };
-
-    // parse fields from alternative sources
-    let field_timestamp: DateTime<Utc> = SystemTime::now().into();
-
-    let field_target = event.metadata().target().to_string();
-
-    let field_thread_name = thread::current()
-        .name()
-        .map(|it| it.to_string())
-        .unwrap_or_default();
-
-    let field_message = event_fields_as_value
-        .get("message")
-        .and_then(|it| it.as_str())
-        .map(|it| it.to_string())
-        .unwrap_or_default();
-
-    // remove message from event fields because it is special and will go to a separe attribute
-    if let Some(obj) = event_fields_as_value.as_object_mut() {
-        obj.remove("message");
-    }
-
-    let log_message = LogMessage {
-        level: event.metadata().level().to_string(),
-        timestamp: field_timestamp.to_rfc3339_opts(SecondsFormat::Millis, true),
-
-        target_simple: event
-            .metadata()
-            .target()
-            .split("::")
-            .map(|it| it.to_string())
-            .last()
-            .unwrap_or_else(|| field_target.clone()),
-        target: field_target,
-
-        file: event.metadata().file().map(|it| it.to_string()),
-        line: event.metadata().line(),
-
-        thread_id: "".to_string(),
-        thread_name: field_thread_name,
-
-        current_span_simple: "".to_string(),
-        current_span: "".to_string(),
-
-        root_span_simple: "".to_string(),
-        root_span: "".to_string(),
-
-        message: field_message,
-        fields: Value::Object(
-            event_fields_as_value
-                .as_object()
-                .cloned()
-                .unwrap_or_default(),
-        ),
-        context: Value::Object(serde_json::Map::default()),
-    };
-
-    log(writer, log_message);
-}
-
-#[allow(clippy::too_many_arguments)]
-fn log_with_context(
-    writer: Writer<'_>,
-    event: &Event,
-    ot_event: opentelemetry::trace::Event,
-    field_context: serde_json::Map<String, Value>,
-    field_fields: serde_json::Map<String, Value>,
-    field_root_span_name: String,
-    field_current_span_name: String,
-    field_thread_id: String,
-    field_thread_name: String,
-) {
-    let field_timestamp: DateTime<Utc> = ot_event.timestamp.into();
-    let field_target = event.metadata().target().to_string();
-    let message = LogMessage {
-        level: event.metadata().level().to_string(),
-        timestamp: field_timestamp.to_rfc3339_opts(SecondsFormat::Millis, true),
-
-        target: event.metadata().target().into(),
-        target_simple: event
-            .metadata()
-            .target()
-            .split("::")
-            .map(|it| it.to_string())
-            .last()
-            .unwrap_or_else(|| field_target.clone()),
-
-        file: event.metadata().file().map(|it| it.to_string()),
-        line: event.metadata().line(),
-
-        thread_id: field_thread_id,
-        thread_name: field_thread_name,
-
-        root_span_simple: field_root_span_name
-            .split("::")
-            .map(|it| it.to_string())
-            .last()
-            .unwrap_or_else(|| field_root_span_name.clone()),
-        root_span: field_root_span_name,
-
-        current_span_simple: field_current_span_name
-            .split("::")
-            .map(|it| it.to_string())
-            .last()
-            .unwrap_or_else(|| field_current_span_name.clone()),
-        current_span: field_current_span_name,
-
-        message: ot_event.name.to_string(),
-        fields: Value::Object(field_fields),
-        context: Value::Object(field_context),
-    };
-
-    log(writer, message);
-}
-
-fn log(mut writer: Writer<'_>, message: LogMessage) {
-    if let Ok(message_as_json) = serde_json::to_string(&message) {
-        let _ = writeln!(writer, "{}", message_as_json);
-    }
 }
 
 // -----------------------------------------------------------------------------
