@@ -317,7 +317,7 @@ struct LogMessage {
     level: String,
     timestamp: String,
 
-    target_parts: Vec<String>,
+    target_simple: String,
     target: String,
     file: Option<String>,
     line: Option<u32>,
@@ -325,10 +325,10 @@ struct LogMessage {
     thread_id: String,
     thread_name: String,
 
-    root_span_parts: Vec<String>,
+    root_span_simple: String,
     root_span: String,
 
-    current_span_parts: Vec<String>,
+    current_span_simple: String,
     current_span: String,
 
     message: String,
@@ -346,6 +346,8 @@ fn log_without_context(writer: Writer<'_>, event: &Event) {
 
     // parse fields from alternative sources
     let field_timestamp: DateTime<Utc> = SystemTime::now().into();
+
+    let field_target = event.metadata().target().to_string();
 
     let field_thread_name = thread::current()
         .name()
@@ -366,20 +368,26 @@ fn log_without_context(writer: Writer<'_>, event: &Event) {
     let log_message = LogMessage {
         level: event.metadata().level().to_string(),
         timestamp: field_timestamp.to_rfc3339_opts(SecondsFormat::Millis, true),
-        target: event.metadata().target().into(),
-        target_parts: event
+
+        target_simple: event
             .metadata()
             .target()
             .split("::")
             .map(|it| it.to_string())
-            .collect(),
+            .last()
+            .unwrap_or_else(|| field_target.clone()),
+        target: field_target,
+
         file: event.metadata().file().map(|it| it.to_string()),
         line: event.metadata().line(),
+
         thread_id: "".to_string(),
         thread_name: field_thread_name,
-        current_span_parts: vec![],
+
+        current_span_simple: "".to_string(),
         current_span: "".to_string(),
-        root_span_parts: vec![],
+
+        root_span_simple: "".to_string(),
         root_span: "".to_string(),
 
         message: field_message,
@@ -408,29 +416,38 @@ fn log_with_context(
     field_thread_name: String,
 ) {
     let field_timestamp: DateTime<Utc> = ot_event.timestamp.into();
+    let field_target = event.metadata().target().to_string();
     let message = LogMessage {
         level: event.metadata().level().to_string(),
         timestamp: field_timestamp.to_rfc3339_opts(SecondsFormat::Millis, true),
+
         target: event.metadata().target().into(),
-        target_parts: event
+        target_simple: event
             .metadata()
             .target()
             .split("::")
             .map(|it| it.to_string())
-            .collect(),
+            .last()
+            .unwrap_or_else(|| field_target.clone()),
+
         file: event.metadata().file().map(|it| it.to_string()),
         line: event.metadata().line(),
+
         thread_id: field_thread_id,
         thread_name: field_thread_name,
-        root_span_parts: field_root_span_name
+
+        root_span_simple: field_root_span_name
             .split("::")
             .map(|it| it.to_string())
-            .collect(),
+            .last()
+            .unwrap_or_else(|| field_root_span_name.clone()),
         root_span: field_root_span_name,
-        current_span_parts: field_current_span_name
+
+        current_span_simple: field_current_span_name
             .split("::")
             .map(|it| it.to_string())
-            .collect(),
+            .last()
+            .unwrap_or_else(|| field_current_span_name.clone()),
         current_span: field_current_span_name,
 
         message: ot_event.name.to_string(),
