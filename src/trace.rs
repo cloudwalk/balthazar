@@ -26,6 +26,7 @@ pub enum TracingFormat {
     Hierarchical,
     Pretty,
     Json,
+    JsonPretty,
 }
 
 // -----------------------------------------------------------------------------
@@ -97,41 +98,50 @@ impl Feature for Tracing {
         //
         // the workaround consists of passing a optional of Layer to every conditional layer,
         // so if Some(layer) is passed, that layer is active, if None the layer is inactive.
-        let (layer_format_json, layer_format_pretty, layer_format_hierarchical) = match config
-            .tracing
-            .format
-        {
-            TracingFormat::None => (None, None, None),
-            TracingFormat::Json => (
-                Some(Layer::default().event_format(JsonFormatter::new(service_name.to_string()))),
-                None,
-                None,
-            ),
-            TracingFormat::Pretty => (
-                None,
-                Some(
-                    Layer::default()
-                        .pretty()
-                        .with_thread_ids(true)
-                        .with_thread_names(true)
-                        .with_target(true)
-                        .with_file(true)
-                        .with_line_number(true)
-                        .with_ansi(!config.core.no_color),
+        let (layer_format_json, layer_format_pretty, layer_format_hierarchical) =
+            match config.tracing.format {
+                TracingFormat::None => (None, None, None),
+                TracingFormat::Json => (
+                    Some(
+                        Layer::default()
+                            .event_format(JsonFormatter::new(service_name.to_string(), false)),
+                    ),
+                    None,
+                    None,
                 ),
-                None,
-            ),
-            TracingFormat::Hierarchical => (
-                None,
-                None,
-                Some(
-                    HierarchicalLayer::new(2)
-                        .with_targets(true)
-                        .with_bracketed_fields(true)
-                        .with_ansi(!config.core.no_color),
+                TracingFormat::JsonPretty => (
+                    Some(
+                        Layer::default()
+                            .event_format(JsonFormatter::new(service_name.to_string(), true)),
+                    ),
+                    None,
+                    None,
                 ),
-            ),
-        };
+                TracingFormat::Pretty => (
+                    None,
+                    Some(
+                        Layer::default()
+                            .pretty()
+                            .with_thread_ids(true)
+                            .with_thread_names(true)
+                            .with_target(true)
+                            .with_file(true)
+                            .with_line_number(true)
+                            .with_ansi(!config.core.no_color),
+                    ),
+                    None,
+                ),
+                TracingFormat::Hierarchical => (
+                    None,
+                    None,
+                    Some(
+                        HierarchicalLayer::new(2)
+                            .with_targets(true)
+                            .with_bracketed_fields(true)
+                            .with_ansi(!config.core.no_color),
+                    ),
+                ),
+            };
 
         Registry::default()
             .with(EnvFilter::from_default_env())
@@ -175,11 +185,15 @@ const EVENT_FIELDS_TO_IGNORE: [&str; 6] = [
 
 struct JsonFormatter {
     service_name: String,
+    pretty: bool,
 }
 
 impl JsonFormatter {
-    fn new(service_name: String) -> Self {
-        Self { service_name }
+    fn new(service_name: String, pretty: bool) -> Self {
+        Self {
+            service_name,
+            pretty,
+        }
     }
 
     fn parse_from_service(&self, target: &str) -> bool {
@@ -301,7 +315,12 @@ impl JsonFormatter {
     }
 
     fn log(&self, mut writer: Writer<'_>, message: LogMessage) {
-        if let Ok(message_as_json) = serde_json::to_string(&message) {
+        let message_as_json_result = if self.pretty {
+            serde_json::to_string_pretty(&message)
+        } else {
+            serde_json::to_string(&message)
+        };
+        if let Ok(message_as_json) = message_as_json_result {
             let _ = writeln!(writer, "{}", message_as_json);
         }
     }
