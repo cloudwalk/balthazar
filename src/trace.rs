@@ -256,9 +256,11 @@ impl JsonFormatter {
 
             current_span_simple: "".to_string(),
             current_span: "".to_string(),
+            current_span_id: 0,
 
             root_span_simple: "".to_string(),
             root_span: "".to_string(),
+            root_span_id: 0,
 
             message: field_message,
             fields: Value::Object(
@@ -281,7 +283,9 @@ impl JsonFormatter {
         ot_event: opentelemetry::trace::Event,
         field_context: serde_json::Map<String, Value>,
         field_fields: serde_json::Map<String, Value>,
+        field_root_span_id: u64,
         field_root_span_name: String,
+        field_current_span_id: u64,
         field_current_span_name: String,
         field_thread_id: String,
         field_thread_name: String,
@@ -305,9 +309,11 @@ impl JsonFormatter {
 
             root_span: field_root_span_name.clone(),
             root_span_simple: self.parse_simple_name(field_root_span_name),
+            root_span_id: field_root_span_id,
 
             current_span: field_current_span_name.clone(),
             current_span_simple: self.parse_simple_name(field_current_span_name),
+            current_span_id: field_current_span_id,
 
             message: ot_event.name.to_string(),
             fields: Value::Object(field_fields),
@@ -351,6 +357,7 @@ where
         };
 
         let mut ot_event: Option<opentelemetry::trace::Event> = None;
+        let mut field_root_span_id = 0u64;
         let mut field_root_span_name = "".to_string();
         let mut field_thread_id = "".to_string();
         let mut field_thread_name = "".to_string();
@@ -383,6 +390,7 @@ where
 
             // 1.3 - keep track of root span name for use after iteration
             if is_root_span {
+                field_root_span_id = span.id().into_u64();
                 field_root_span_name = span.name().to_string();
             }
 
@@ -459,7 +467,9 @@ where
             ot_event,
             field_context,
             field_fields,
+            field_root_span_id,
             field_root_span_name,
+            current_span.id().into_u64(),
             current_span.name().into(),
             field_thread_id,
             field_thread_name,
@@ -485,9 +495,11 @@ struct LogMessage {
 
     root_span_simple: String,
     root_span: String,
+    root_span_id: u64,
 
     current_span_simple: String,
     current_span: String,
+    current_span_id: u64,
 
     message: String,
     fields: Value,
