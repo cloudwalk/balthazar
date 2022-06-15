@@ -2,17 +2,11 @@ use std::ops::Deref;
 
 use crate::*;
 
-use bb8_redis::{
-    bb8::Pool,
-    RedisConnectionManager,
-};
+use bb8_redis::{bb8::Pool, RedisConnectionManager};
 
 #[derive(Debug, Clone, Parser)]
 pub struct RedisConfig {
-    #[clap(
-        long = "redis-url",
-        env = "REDIS_URL"
-    )]
+    #[clap(long = "redis-url", env = "REDIS_URL")]
     pub url: String,
 }
 
@@ -27,7 +21,9 @@ impl Feature for Redis {
         let manager = RedisConnectionManager::new(config.redis.url)?;
         let connection_pool = Pool::builder().build(manager).await?;
 
-        Ok(Self { pool: connection_pool })
+        Ok(Self {
+            pool: connection_pool,
+        })
     }
 }
 
@@ -35,6 +31,6 @@ impl Deref for Redis {
     type Target = Pool<RedisConnectionManager>;
 
     fn deref(&self) -> &Self::Target {
-        &self.pool                                    
-    }                                                        
-} 
+        &self.pool
+    }
+}

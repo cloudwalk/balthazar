@@ -196,8 +196,11 @@ impl JsonFormatter {
         }
     }
 
-    fn parse_from_service(&self, target: &str) -> bool {
-        target.to_string().starts_with(&self.service_name)
+    fn parse_from_service(&self, target: &str) -> u8 {
+        match target.to_string().starts_with(&self.service_name) {
+            true => 1,
+            false => 0
+        }
     }
 
     fn parse_simple_name(&self, name: String) -> String {
@@ -467,7 +470,7 @@ where
 
 #[derive(Debug, Serialize)]
 struct LogMessage {
-    from_service: bool,
+    from_service: u8,
 
     level: String,
     timestamp: String,

@@ -1,16 +1,13 @@
 use std::ops::Deref;
 
-use sqlx::{postgres::PgPoolOptions, Pool};
 use sqlx::Postgres as LibPosgtres;
+use sqlx::{postgres::PgPoolOptions, Pool};
 
 use crate::*;
 
 #[derive(Debug, Clone, Parser)]
 pub struct PostgresConfig {
-    #[clap(
-        long = "postgres-url",
-        env = "POSTGRES_URL"
-    )]
+    #[clap(long = "postgres-url", env = "POSTGRES_URL")]
     pub url: String,
 
     #[clap(

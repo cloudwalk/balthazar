@@ -29,9 +29,7 @@ pub mod sensitive {
 
     impl<T> Debug for Sensitive<T> {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-            f.debug_tuple("Sensitive<T>")
-                .field(&MASK)
-                .finish()
+            f.debug_tuple("Sensitive<T>").field(&MASK).finish()
         }
     }
 
@@ -41,13 +39,16 @@ pub mod sensitive {
         }
     }
 
-    impl<T> FromStr for Sensitive<T> where T: FromStr {
+    impl<T> FromStr for Sensitive<T>
+    where
+        T: FromStr,
+    {
         type Err = T::Err;
 
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             match T::from_str(s) {
                 Ok(t) => Ok(Sensitive(t)),
-                Err(e) => Err(e)
+                Err(e) => Err(e),
             }
         }
     }
@@ -90,8 +91,8 @@ pub mod sensitive {
             let s: Sensitive<String> = "123456".to_string().into();
             assert_eq!(s.deref(), "123456");
 
-            let v: Sensitive<Vec<u8>> = vec![1,2,3].into();
-            assert_eq!(*v.deref(), vec![1,2,3]);
+            let v: Sensitive<Vec<u8>> = vec![1, 2, 3].into();
+            assert_eq!(*v.deref(), vec![1, 2, 3]);
         }
     }
 }
