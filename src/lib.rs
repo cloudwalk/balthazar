@@ -41,8 +41,8 @@ pub trait Feature {
         Self: Sized;
 }
 
-#[derive(Debug, Clone)]
-pub struct Environment<T: Debug + Clone + Args> {
+#[derive(Debug)]
+pub struct Environment<T: Debug + Args> {
     pub service_name: String,
     pub config: Config<T>,
     pub tracing: Tracing,
@@ -71,8 +71,8 @@ pub struct EnvironmentConfig {
     pub redis: RedisConfig,
 }
 
-#[derive(Debug, Clone, Parser)]
-pub struct Config<T: Debug + Clone + Args> {
+#[derive(Debug, Parser)]
+pub struct Config<T: Debug + Args> {
     #[clap(flatten)]
     pub project: T,
 
@@ -80,7 +80,7 @@ pub struct Config<T: Debug + Clone + Args> {
     pub environment: EnvironmentConfig,
 }
 
-impl<T: Debug + Clone + Args> Config<T> {
+impl<T: Debug + Args> Config<T> {
     pub async fn init<S: AsRef<str>>(service_name: S) -> Result<Environment<T>> {
         let Self {
             project,

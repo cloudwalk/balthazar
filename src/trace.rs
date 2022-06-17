@@ -66,7 +66,7 @@ pub struct TracingConfig {
 // -----------------------------------------------------------------------------
 // Service
 // -----------------------------------------------------------------------------
-#[derive(clap::Parser, Debug, Clone)]
+#[derive(clap::Parser, Debug)]
 pub struct Tracing;
 
 #[async_trait]
@@ -199,7 +199,7 @@ impl JsonFormatter {
     fn parse_from_service(&self, target: &str) -> u8 {
         match target.to_string().starts_with(&self.service_name) {
             true => 1,
-            false => 0
+            false => 0,
         }
     }
 
