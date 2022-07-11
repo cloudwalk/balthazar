@@ -19,7 +19,7 @@ serde_json = "1.0"
 tracing-serde = "0.1"
 http = "0.2"
 reqwest = "0.11"
-tower-http = { version = "0.3", features = ["trace"] }
+tower-http = { version = "0.3", features = ["trace", "request-id"] }
 axum = { version = "0.5", features = ["headers"] }
 strum = { version = "0.24", features = ["derive"] }
 time = { version = "0.3", features = ["quickcheck", "serde", "serde-well-known"] }

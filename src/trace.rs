@@ -3,6 +3,7 @@ use std::{borrow::Cow, fmt::Debug, str::FromStr, thread, time::SystemTime};
 use axum::extract::{MatchedPath, OriginalUri};
 use chrono::{DateTime, SecondsFormat, Utc};
 use http::{header::HeaderName, HeaderMap, HeaderValue, Method, Request};
+use opentelemetry::sdk::propagation::TraceContextPropagator;
 use opentelemetry::{
     global,
     propagation::{Extractor, Injector},
@@ -11,7 +12,10 @@ use opentelemetry::{
 use reqwest::RequestBuilder;
 use serde::Serialize;
 use serde_json::Value;
-use tower_http::trace::MakeSpan;
+use tower_http::{
+    request_id::{MakeRequestId, RequestId},
+    trace::MakeSpan,
+};
 use tracing::{Event, Level, Span, Subscriber};
 use tracing_opentelemetry::{OpenTelemetrySpanExt, OtelData};
 use tracing_serde::fields::AsMap;
@@ -26,6 +30,7 @@ use tracing_subscriber::{
     {EnvFilter, Registry},
 };
 use tracing_tree::HierarchicalLayer;
+use uuid::Uuid;
 
 use crate::{async_trait, EnvironmentConfig, Feature, Parser, Result};
 
@@ -165,6 +170,7 @@ impl Feature for Tracing {
 
         tracing::debug!("started tracer");
 
+        global::set_text_map_propagator(TraceContextPropagator::new());
         Ok(Self)
     }
 }
@@ -635,5 +641,22 @@ fn http_method(method: &Method) -> Cow<'static, str> {
         &Method::PUT => "PUT".into(),
         &Method::TRACE => "TRACE".into(),
         other => other.to_string().into(),
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct UuidMakeRequestId {}
+
+impl MakeRequestId for UuidMakeRequestId {
+    fn make_request_id<B>(&mut self, request: &Request<B>) -> Option<RequestId> {
+        let request_id: HeaderValue = request
+            .headers()
+            .get("x-request-id")
+            .map(|header| header.to_str().unwrap().to_string())
+            .unwrap_or_else(|| Uuid::new_v4().to_string())
+            .parse()
+            .unwrap();
+
+        Some(RequestId::new(request_id))
     }
 }
