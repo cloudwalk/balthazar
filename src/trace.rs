@@ -1,18 +1,30 @@
+use std::{borrow::Cow, fmt::Debug, str::FromStr, thread, time::SystemTime};
+
+use axum::extract::{MatchedPath, OriginalUri};
 use chrono::{DateTime, SecondsFormat, Utc};
+use http::{header::HeaderName, HeaderMap, HeaderValue, Method, Request};
+use opentelemetry::{
+    global,
+    propagation::{Extractor, Injector},
+    Context,
+};
+use reqwest::RequestBuilder;
 use serde::Serialize;
 use serde_json::Value;
-use std::fmt::Debug;
-use std::thread;
-use std::time::SystemTime;
-use tracing::{Event, Subscriber};
-use tracing_opentelemetry::OtelData;
+use tower_http::trace::MakeSpan;
+use tracing::{Event, Level, Span, Subscriber};
+use tracing_opentelemetry::{OpenTelemetrySpanExt, OtelData};
 use tracing_serde::fields::AsMap;
-use tracing_subscriber::fmt::format::{DefaultFields, Writer};
-use tracing_subscriber::fmt::{FmtContext, FormatEvent, Layer};
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::registry::{LookupSpan, SpanRef};
-use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::{EnvFilter, Registry};
+use tracing_subscriber::{
+    fmt::{
+        format::{DefaultFields, Writer},
+        {FmtContext, FormatEvent, Layer},
+    },
+    layer::SubscriberExt,
+    registry::{LookupSpan, SpanRef},
+    util::SubscriberInitExt,
+    {EnvFilter, Registry},
+};
 use tracing_tree::HierarchicalLayer;
 
 use crate::{async_trait, EnvironmentConfig, Feature, Parser, Result};
@@ -520,5 +532,108 @@ impl From<OpenTelemetryValue> for serde_json::Value {
             opentelemetry::Value::String(v) => Value::String(v.to_string()),
             opentelemetry::Value::Array(_) => Value::String("".to_string()),
         }
+    }
+}
+
+pub trait RequestTracerPropagation<T> {
+    fn trace_request(self) -> T
+    where
+        Self: Sized,
+    {
+        self.trace_request_with_context(Span::current().context())
+    }
+
+    fn trace_request_with_context(self, context: Context) -> T;
+}
+
+impl RequestTracerPropagation<RequestBuilder> for RequestBuilder {
+    fn trace_request_with_context(mut self, context: Context) -> RequestBuilder {
+        let mut header_carrier = HeaderCarrier { headers: vec![] };
+        global::get_text_map_propagator(|injector| {
+            injector.inject_context(&context, &mut header_carrier);
+        });
+
+        for header in header_carrier.headers {
+            self = self.header(header.0, header.1)
+        }
+
+        self
+    }
+}
+
+struct HeaderCarrier {
+    pub headers: Vec<(HeaderName, HeaderValue)>,
+}
+
+impl<'a> Injector for HeaderCarrier {
+    fn set(&mut self, key: &str, value: String) {
+        let header_name = HeaderName::from_str(key).expect("Must be header name");
+        let header_value = HeaderValue::from_str(&value).expect("Must be a header value");
+        self.headers.push((header_name, header_value));
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct MakeSpanWithContext;
+
+impl<B> MakeSpan<B> for MakeSpanWithContext {
+    fn make_span(&mut self, req: &Request<B>) -> Span {
+        let remote_context = extract_remote_context(req.headers());
+
+        let http_route = if let Some(matched_path) = req.extensions().get::<MatchedPath>() {
+            matched_path.as_str().to_owned()
+        } else if let Some(uri) = req.extensions().get::<OriginalUri>() {
+            uri.0.path().to_owned()
+        } else {
+            req.uri().path().to_owned()
+        };
+
+        let http_method_v = http_method(req.method());
+
+        let name = format!("{} {}", http_method_v, http_route);
+        let span = tracing::span!(
+            Level::INFO,
+            "HTTP request",
+            otel.name= %name,
+            method = %req.method(),
+            uri = %req.uri(),
+            version = ?req.version(),
+            headers = ?req.headers(),
+        );
+        tracing_opentelemetry::OpenTelemetrySpanExt::set_parent(&span, remote_context);
+
+        span
+    }
+}
+
+fn extract_remote_context(headers: &HeaderMap) -> Context {
+    struct HeaderExtractor<'a>(&'a HeaderMap);
+
+    impl<'a> Extractor for HeaderExtractor<'a> {
+        fn get(&self, key: &str) -> Option<&str> {
+            self.0.get(key).and_then(|value| value.to_str().ok())
+        }
+
+        fn keys(&self) -> Vec<&str> {
+            self.0.keys().map(|value| value.as_str()).collect()
+        }
+    }
+
+    let extractor = HeaderExtractor(headers);
+    global::get_text_map_propagator(|propagator| propagator.extract(&extractor))
+}
+
+fn http_method(method: &Method) -> Cow<'static, str> {
+    match method {
+        &Method::CONNECT => "CONNECT".into(),
+        &Method::DELETE => "DELETE".into(),
+        &Method::GET => "GET".into(),
+        &Method::HEAD => "HEAD".into(),
+        &Method::OPTIONS => "OPTIONS".into(),
+        &Method::PATCH => "PATCH".into(),
+        &Method::POST => "POST".into(),
+        &Method::PUT => "PUT".into(),
+        &Method::TRACE => "TRACE".into(),
+        other => other.to_string().into(),
     }
 }
