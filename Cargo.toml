@@ -19,6 +19,7 @@ serde_json = "1.0"
 tracing-serde = "0.1"
 http = "0.2"
 reqwest = "0.11"
+reqwest-middleware = "0.1.6"
 tower-http = { version = "0.3", features = ["trace", "request-id"] }
 axum = { version = "0.5", features = ["headers"] }
 strum = { version = "0.24", features = ["derive"] }

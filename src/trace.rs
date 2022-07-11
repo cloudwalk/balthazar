@@ -567,6 +567,26 @@ impl RequestTracerPropagation<RequestBuilder> for RequestBuilder {
     }
 }
 
+impl RequestTracerPropagation<reqwest_middleware::RequestBuilder>
+    for reqwest_middleware::RequestBuilder
+{
+    fn trace_request_with_context(
+        mut self,
+        context: Context,
+    ) -> reqwest_middleware::RequestBuilder {
+        let mut header_carrier = HeaderCarrier { headers: vec![] };
+        global::get_text_map_propagator(|injector| {
+            injector.inject_context(&context, &mut header_carrier);
+        });
+
+        for header in header_carrier.headers {
+            self = self.header(header.0, header.1)
+        }
+
+        self
+    }
+}
+
 struct HeaderCarrier {
     pub headers: Vec<(HeaderName, HeaderValue)>,
 }
