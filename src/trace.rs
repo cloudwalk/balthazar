@@ -672,10 +672,8 @@ impl MakeRequestId for UuidMakeRequestId {
         let request_id: HeaderValue = request
             .headers()
             .get("x-request-id")
-            .map(|header| header.to_str().unwrap().to_string())
-            .unwrap_or_else(|| Uuid::new_v4().to_string())
-            .parse()
-            .unwrap();
+            .map(|header| header.clone())
+            .unwrap_or_else(|| Uuid::new_v4().to_string().parse().unwrap());
 
         Some(RequestId::new(request_id))
     }
