@@ -8,7 +8,10 @@ mod trace;
 pub use crate::core::CoreConfig;
 #[allow(deprecated)]
 pub use crate::lang::sensitive::{Sensitive, SensitiveString};
-pub use crate::trace::{Tracing, TracingConfig, TracingFormat};
+pub use crate::trace::{
+    MakeSpanWithContext, RequestTracerPropagation, Tracing, TracingConfig, TracingFormat,
+    UuidMakeRequestId,
+};
 
 pub use async_trait::async_trait;
 pub use clap::{self, Args, Parser};
