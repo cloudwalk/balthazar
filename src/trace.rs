@@ -91,7 +91,8 @@ impl Feature for Tracing {
     async fn init(service_name: &str, config: EnvironmentConfig) -> Result<Self> {
         std::env::set_var("RUST_LOG", &config.tracing.log_level);
 
-        let telemetry = if config.tracing.disable_opentelemetry {
+        // OPENTELEMETRY LAYER
+        let telemetry_layer = if config.tracing.disable_opentelemetry {
             None
         } else {
             let tracer = opentelemetry_jaeger::new_pipeline()
@@ -105,6 +106,13 @@ impl Feature for Tracing {
             )
         };
 
+        // SENTRY LAYER
+        #[cfg(feature = "sentry")]
+        let sentry_layer = Some(sentry_tracing::layer());
+        #[cfg(not(feature = "sentry"))]
+        let sentry_layer: Option<HierarchicalLayer> = None; // generic type here does not matter because it will always be None
+
+        // FORMATTER LAYER
         // tracing_subscriber lib currently does not support dynamically adding layer to registry
         // accordingly to some condition. this can be verified in the following issues:
         // https://github.com/tokio-rs/tracing/issues/575
@@ -162,10 +170,11 @@ impl Feature for Tracing {
 
         Registry::default()
             .with(EnvFilter::from_default_env())
-            .with(telemetry)
+            .with(telemetry_layer)
             .with(layer_format_json)
             .with(layer_format_pretty)
             .with(layer_format_hierarchical)
+            .with(sentry_layer)
             .init();
 
         tracing::debug!("started tracer");
