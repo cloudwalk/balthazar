@@ -8,7 +8,7 @@ use crate::*;
 #[derive(Debug, Clone, Parser)]
 pub struct PostgresConfig {
     #[clap(long = "postgres-url", env = "POSTGRES_URL")]
-    pub url: String,
+    pub url: Sensitive<String>,
 
     #[clap(
         long = "postgres-max-connections",

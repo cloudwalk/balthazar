@@ -7,7 +7,7 @@ use bb8_redis::{bb8::Pool, RedisConnectionManager};
 #[derive(Debug, Clone, Parser)]
 pub struct RedisConfig {
     #[clap(long = "redis-url", env = "REDIS_URL")]
-    pub url: String,
+    pub url: Sensitive<String>,
 }
 
 #[derive(Debug, Clone)]
