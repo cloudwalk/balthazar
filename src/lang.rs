@@ -13,7 +13,7 @@ pub mod sensitive {
     const MASK: &str = "******";
 
     #[derive(Clone, Serialize, Deserialize)]
-    pub struct Sensitive<T>(T);
+    pub struct Sensitive<T>(pub T);
 
     impl<T> Sensitive<T> {
         pub fn new(value: T) -> Self {
@@ -60,6 +60,18 @@ pub mod sensitive {
             &self.0
         }
     }
+
+    impl<T> PartialEq<Self> for Sensitive<T>
+    where
+        T: Eq,
+    {
+        fn eq(&self, other: &Self) -> bool {
+            let other: &Sensitive<T> = other.clone();
+            self.0.eq(other)
+        }
+    }
+
+    impl<T> Eq for Sensitive<T> where T: Eq {}
 
     #[deprecated(note = "please use Sensitive<String> instead")]
     pub type SensitiveString = Sensitive<String>;
