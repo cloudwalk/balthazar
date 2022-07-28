@@ -634,6 +634,7 @@ impl<B> MakeSpan<B> for MakeSpanWithContext {
             uri = %req.uri(),
             version = ?req.version(),
             headers = ?req.headers(),
+            status_code = tracing::field::Empty,
         );
         tracing_opentelemetry::OpenTelemetrySpanExt::set_parent(&span, remote_context);
 
