@@ -16,9 +16,10 @@ use tower_http::{
     request_id::{MakeRequestId, RequestId},
     trace::MakeSpan,
 };
-use tracing::{Event, Level, Span, Subscriber};
+use tracing::{Event, Level, metadata, Span, Subscriber};
 use tracing_opentelemetry::{OpenTelemetrySpanExt, OtelData};
 use tracing_serde::fields::AsMap;
+use tracing_subscriber::filter::FilterFn;
 use tracing_subscriber::{
     fmt::{
         format::{DefaultFields, Writer},
@@ -27,8 +28,9 @@ use tracing_subscriber::{
     layer::SubscriberExt,
     registry::{LookupSpan, SpanRef},
     util::SubscriberInitExt,
-    {EnvFilter, Registry},
+    Layer as SubscriberLayer, {EnvFilter, Registry},
 };
+use tracing_subscriber::fmt::writer::MakeWriterExt;
 use tracing_tree::HierarchicalLayer;
 use uuid::Uuid;
 
@@ -52,30 +54,30 @@ pub enum TracingFormat {
 #[derive(Debug, Clone, Parser)]
 pub struct TracingConfig {
     #[clap(
-        long = "tracing-disable-opentelemetry",
-        env = "TRACING_DISABLE_OPENTELEMETRY"
+    long = "tracing-disable-opentelemetry",
+    env = "TRACING_DISABLE_OPENTELEMETRY"
     )]
     pub disable_opentelemetry: bool,
 
     #[clap(
-        long = "tracing-opentelemetry-endpoint",
-        env = "TRACING_OPENTELEMETRY_ENDPOINT",
-        default_value = "http://localhost:14268/api/traces"
+    long = "tracing-opentelemetry-endpoint",
+    env = "TRACING_OPENTELEMETRY_ENDPOINT",
+    default_value = "http://localhost:14268/api/traces"
     )]
     pub opentelemetry_endpoint: String,
 
     #[clap(
-        long = "tracing-log-level",
-        env = "TRACING_LOG_LEVEL",
-        default_value = "debug"
+    long = "tracing-log-level",
+    env = "TRACING_LOG_LEVEL",
+    default_value = "debug"
     )]
     pub log_level: String,
 
     #[clap(
-        arg_enum,
-        long = "tracing-format",
-        env = "TRACING_FORMAT",
-        default_value = "pretty"
+    arg_enum,
+    long = "tracing-format",
+    env = "TRACING_FORMAT",
+    default_value = "pretty"
     )]
     pub format: TracingFormat,
 }
@@ -99,18 +101,24 @@ impl Feature for Tracing {
                 .with_collector_endpoint(&config.tracing.opentelemetry_endpoint)
                 .with_service_name(service_name)
                 .install_batch(opentelemetry::runtime::Tokio)?;
+
+            let status_filter = FilterFn::new(|metadata| {
+                println!("metadata.name {}", metadata.name());
+                !metadata.name().contains("/status")
+            });
             Some(
                 tracing_opentelemetry::layer()
                     .with_tracked_inactivity(false)
-                    .with_tracer(tracer),
+                    .with_tracer(tracer)
+                    .with_filter(status_filter)
             )
         };
 
         // SENTRY LAYER
         #[cfg(feature = "sentry")]
-        let sentry_layer = Some(sentry_tracing::layer());
+            let sentry_layer = Some(sentry_tracing::layer());
         #[cfg(not(feature = "sentry"))]
-        let sentry_layer: Option<HierarchicalLayer> = None; // generic type here does not matter because it will always be None
+            let sentry_layer: Option<HierarchicalLayer> = None; // generic type here does not matter because it will always be None
 
         // FORMATTER LAYER
         // tracing_subscriber lib currently does not support dynamically adding layer to registry
@@ -363,8 +371,8 @@ impl JsonFormatter {
 }
 
 impl<S> FormatEvent<S, DefaultFields> for JsonFormatter
-where
-    S: Subscriber + for<'lookup> LookupSpan<'lookup>,
+    where
+        S: Subscriber + for<'lookup> LookupSpan<'lookup>,
 {
     fn format_event(
         &self,
@@ -552,8 +560,8 @@ impl From<OpenTelemetryValue> for serde_json::Value {
 
 pub trait RequestTracerPropagation<T> {
     fn trace_request(self) -> T
-    where
-        Self: Sized,
+        where
+            Self: Sized,
     {
         self.trace_request_with_context(Span::current().context())
     }
@@ -577,7 +585,7 @@ impl RequestTracerPropagation<RequestBuilder> for RequestBuilder {
 }
 
 impl RequestTracerPropagation<reqwest_middleware::RequestBuilder>
-    for reqwest_middleware::RequestBuilder
+for reqwest_middleware::RequestBuilder
 {
     fn trace_request_with_context(
         mut self,
