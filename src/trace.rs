@@ -4,6 +4,7 @@ use axum::extract::{MatchedPath, OriginalUri};
 use chrono::{DateTime, SecondsFormat, Utc};
 use http::{header::HeaderName, HeaderMap, HeaderValue, Method, Request};
 use opentelemetry::sdk::propagation::TraceContextPropagator;
+use opentelemetry::trace::TraceContextExt;
 use opentelemetry::{
     global,
     propagation::{Extractor, Injector},
@@ -31,6 +32,12 @@ use tracing_subscriber::{
 };
 use tracing_tree::HierarchicalLayer;
 use uuid::Uuid;
+
+#[cfg(feature = "sentry")]
+use sentry_tracing::{
+    breadcrumb_from_event, default_event_filter, event_from_event, exception_from_event,
+    EventFilter, EventMapping,
+};
 
 use crate::{async_trait, EnvironmentConfig, Feature, Parser, Result};
 
@@ -78,6 +85,25 @@ pub struct TracingConfig {
         default_value = "pretty"
     )]
     pub format: TracingFormat,
+
+    #[cfg(feature = "sentry")]
+    #[clap(flatten)]
+    pub honeycomb: HoneycombConfig,
+}
+
+// -----------------------------------------------------------------------------
+// Honeycomb Config
+// -----------------------------------------------------------------------------
+#[derive(Debug, Clone, Parser)]
+pub struct HoneycombConfig {
+    #[clap(env = "HONEYCOMB_TEAM", default_value = "infinitepay---issuing")]
+    pub honeycomb_team: String,
+
+    #[clap(env = "HONEYCOMB_DATASET", default_value = "")]
+    pub honeycomb_dataset: String,
+
+    #[clap(env = "HONEYCOMB_ENVIRONMENT", default_value = "staging")]
+    pub honeycomb_environment: String,
 }
 
 // -----------------------------------------------------------------------------
@@ -89,6 +115,8 @@ pub struct Tracing;
 #[async_trait]
 impl Feature for Tracing {
     async fn init(service_name: &str, config: EnvironmentConfig) -> Result<Self> {
+        global::set_text_map_propagator(TraceContextPropagator::new());
+
         std::env::set_var("RUST_LOG", &config.tracing.log_level);
 
         // OPENTELEMETRY LAYER
@@ -108,7 +136,39 @@ impl Feature for Tracing {
 
         // SENTRY LAYER
         #[cfg(feature = "sentry")]
-        let sentry_layer = Some(sentry_tracing::layer());
+        let event_filter = Box::new(default_event_filter);
+
+        #[cfg(feature = "sentry")]
+        let sentry_layer = Some(
+            sentry_tracing::layer()
+                .event_filter(event_filter.clone())
+                .event_mapper(move |event, context| {
+                    let honeycomb_trace = honeycomb_trace(
+                        &config.tracing.honeycomb.honeycomb_team,
+                        &config.tracing.honeycomb.honeycomb_dataset,
+                        &config.tracing.honeycomb.honeycomb_environment,
+                    );
+
+                    match (event_filter)(event.metadata()) {
+                        EventFilter::Ignore => EventMapping::Ignore,
+                        EventFilter::Breadcrumb => {
+                            EventMapping::Breadcrumb(breadcrumb_from_event(event))
+                        }
+                        EventFilter::Event => {
+                            let mut event = event_from_event(event, context);
+                            event.tags.insert(honeycomb_trace.0, honeycomb_trace.1);
+
+                            EventMapping::Event(event)
+                        }
+                        EventFilter::Exception => {
+                            let mut event = exception_from_event(event, context);
+                            event.tags.insert(honeycomb_trace.0, honeycomb_trace.1);
+
+                            EventMapping::Event(event)
+                        }
+                    }
+                }),
+        );
         #[cfg(not(feature = "sentry"))]
         let sentry_layer: Option<HierarchicalLayer> = None; // generic type here does not matter because it will always be None
 
@@ -179,7 +239,6 @@ impl Feature for Tracing {
 
         tracing::debug!("started tracer");
 
-        global::set_text_map_propagator(TraceContextPropagator::new());
         Ok(Self)
     }
 }
@@ -687,4 +746,16 @@ impl MakeRequestId for UuidMakeRequestId {
 
         Some(RequestId::new(request_id))
     }
+}
+
+pub fn honeycomb_trace(team: &str, dataset: &str, env: &str) -> (String, String) {
+    let context = Span::current().context();
+    let span = context.span();
+    let span_context = span.span_context();
+
+    let trace_id = span_context.trace_id().to_string();
+    let trace_start = Utc::now().timestamp() - 600; // starts from 10 minutes before now
+    let trace_end = Utc::now().timestamp() + 600; // ends 10 minutes after now
+
+    ("honeycomb_trace".to_string(), format!("https://ui.honeycomb.io/{}/environments/{}/datasets/{}/trace?trace_id={}&trace_start_ts={}&trace_end_ts={}", team, env, dataset, trace_id, trace_start, trace_end))
 }
