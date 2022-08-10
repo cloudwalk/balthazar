@@ -736,11 +736,14 @@ impl<S: Subscriber> TracingLayer<S> for HoneycombTraceOnSentryScope {
         let span_context = span.span_context();
 
         let trace_id = span_context.trace_id().to_string();
-        let trace_start = Utc::now().timestamp() - 600; // starts from 10 minutes before now
-        let trace_end = Utc::now().timestamp() + 600; // ends 10 minutes after now
 
-        sentry::configure_scope(|scope| {
-            scope.set_tag("honeycomb_trace", format!("https://ui.honeycomb.io/{}/environments/{}/datasets/{}/trace?trace_id={}&trace_start_ts={}&trace_end_ts={}", self.team, self.env, self.dataset, trace_id, trace_start, trace_end))
-        });
+        if trace_id != "00000000000000000000000000000000" {
+            let trace_start = Utc::now().timestamp() - 600; // starts from 10 minutes before now
+            let trace_end = Utc::now().timestamp() + 600; // ends 10 minutes after now
+
+            sentry::configure_scope(|scope| {
+                scope.set_tag("honeycomb_trace", format!("https://ui.honeycomb.io/{}/environments/{}/datasets/{}/trace?trace_id={}&trace_start_ts={}&trace_end_ts={}", self.team, self.env, self.dataset, trace_id, trace_start, trace_end))
+            });
+        }
     }
 }
