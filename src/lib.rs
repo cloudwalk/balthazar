@@ -9,8 +9,8 @@ pub use crate::core::CoreConfig;
 #[allow(deprecated)]
 pub use crate::lang::sensitive::{Sensitive, SensitiveString};
 pub use crate::trace::{
-    MakeSpanWithContext, RequestTracerPropagation, Tracing, TracingConfig, TracingFormat,
-    UuidMakeRequestId,
+    HoneycombConfig, MakeSpanWithContext, RequestTracerPropagation, Tracing, TracingConfig,
+    TracingFormat, UuidMakeRequestId,
 };
 
 pub use async_trait::async_trait;
