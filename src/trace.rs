@@ -35,6 +35,8 @@ use uuid::Uuid;
 
 use crate::{async_trait, EnvironmentConfig, Feature, Parser, Result};
 
+const NOOP_SPAN_ID: &str = "00000000000000000000000000000000";
+
 // -----------------------------------------------------------------------------
 // Supported Formats
 // -----------------------------------------------------------------------------
@@ -736,8 +738,9 @@ impl<S: Subscriber> TracingLayer<S> for HoneycombTraceOnSentryScope {
         let span_context = span.span_context();
 
         let trace_id = span_context.trace_id().to_string();
+        let supported_environments = vec!["staging", "production"];
 
-        if trace_id != "00000000000000000000000000000000" {
+        if trace_id != NOOP_SPAN_ID && supported_environments.contains(&&*self.env) {
             let trace_start = Utc::now().timestamp() - 600; // starts from 10 minutes before now
             let trace_end = Utc::now().timestamp() + 600; // ends 10 minutes after now
 
