@@ -4,6 +4,7 @@ use axum::extract::{MatchedPath, OriginalUri};
 use chrono::{DateTime, SecondsFormat, Utc};
 use http::{header::HeaderName, HeaderMap, HeaderValue, Method, Request};
 use opentelemetry::sdk::propagation::TraceContextPropagator;
+use opentelemetry::trace::TraceContextExt;
 use opentelemetry::{
     global,
     propagation::{Extractor, Injector},
@@ -16,7 +17,7 @@ use tower_http::{
     request_id::{MakeRequestId, RequestId},
     trace::MakeSpan,
 };
-use tracing::{Event, Level, Span, Subscriber};
+use tracing::{Event, Id, Level, Span, Subscriber};
 use tracing_opentelemetry::{OpenTelemetrySpanExt, OtelData};
 use tracing_serde::fields::AsMap;
 use tracing_subscriber::{
@@ -27,12 +28,14 @@ use tracing_subscriber::{
     layer::SubscriberExt,
     registry::{LookupSpan, SpanRef},
     util::SubscriberInitExt,
-    {EnvFilter, Registry},
+    Layer as TracingLayer, {EnvFilter, Registry},
 };
 use tracing_tree::HierarchicalLayer;
 use uuid::Uuid;
 
 use crate::{async_trait, EnvironmentConfig, Feature, Parser, Result};
+
+const NOOP_SPAN_ID: &str = "00000000000000000000000000000000";
 
 // -----------------------------------------------------------------------------
 // Supported Formats
@@ -78,6 +81,22 @@ pub struct TracingConfig {
         default_value = "pretty"
     )]
     pub format: TracingFormat,
+
+    #[cfg(feature = "sentry")]
+    #[clap(flatten)]
+    pub honeycomb: HoneycombConfig,
+}
+
+// -----------------------------------------------------------------------------
+// Honeycomb Config
+// -----------------------------------------------------------------------------
+#[derive(Debug, Clone, Parser)]
+pub struct HoneycombConfig {
+    #[clap(env = "HONEYCOMB_TEAM", default_value = "infinitepay---issuing")]
+    pub honeycomb_team: String,
+
+    #[clap(env = "ENVIRONMENT", default_value = "staging")]
+    pub honeycomb_environment: String,
 }
 
 // -----------------------------------------------------------------------------
@@ -107,6 +126,15 @@ impl Feature for Tracing {
         };
 
         // SENTRY LAYER
+        #[cfg(feature = "sentry")]
+        let honeycomb_trace = Some(HoneycombTraceOnSentryScope::new(
+            config.tracing.honeycomb.honeycomb_team,
+            service_name.to_string(),
+            config.tracing.honeycomb.honeycomb_environment,
+        ));
+        #[cfg(not(feature = "sentry"))]
+        let honeycomb_trace: Option<HierarchicalLayer> = None; // generic type here does not matter because it will always be None
+
         #[cfg(feature = "sentry")]
         let sentry_layer = Some(sentry_tracing::layer());
         #[cfg(not(feature = "sentry"))]
@@ -174,12 +202,14 @@ impl Feature for Tracing {
             .with(layer_format_json)
             .with(layer_format_pretty)
             .with(layer_format_hierarchical)
+            .with(honeycomb_trace)
             .with(sentry_layer)
             .init();
 
         tracing::debug!("started tracer");
 
         global::set_text_map_propagator(TraceContextPropagator::new());
+
         Ok(Self)
     }
 }
@@ -686,5 +716,37 @@ impl MakeRequestId for UuidMakeRequestId {
             .unwrap_or_else(|| Uuid::new_v4().to_string().parse().unwrap());
 
         Some(RequestId::new(request_id))
+    }
+}
+
+struct HoneycombTraceOnSentryScope {
+    team: String,
+    dataset: String,
+    env: String,
+}
+
+impl HoneycombTraceOnSentryScope {
+    pub fn new(team: String, dataset: String, env: String) -> HoneycombTraceOnSentryScope {
+        HoneycombTraceOnSentryScope { team, dataset, env }
+    }
+}
+
+impl<S: Subscriber> TracingLayer<S> for HoneycombTraceOnSentryScope {
+    fn on_enter(&self, _id: &Id, _ctx: tracing_subscriber::layer::Context<'_, S>) {
+        let context = Span::current().context();
+        let span = context.span();
+        let span_context = span.span_context();
+
+        let trace_id = span_context.trace_id().to_string();
+        let supported_environments = vec!["staging", "production"];
+
+        if trace_id != NOOP_SPAN_ID && supported_environments.contains(&&*self.env) {
+            let trace_start = Utc::now().timestamp() - 600; // starts from 10 minutes before now
+            let trace_end = Utc::now().timestamp() + 600; // ends 10 minutes after now
+
+            sentry::configure_scope(|scope| {
+                scope.set_tag("honeycomb_trace", format!("https://ui.honeycomb.io/{}/environments/{}/datasets/{}/trace?trace_id={}&trace_start_ts={}&trace_end_ts={}", self.team, self.env, self.dataset, trace_id, trace_start, trace_end))
+            });
+        }
     }
 }
