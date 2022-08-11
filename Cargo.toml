@@ -48,7 +48,7 @@ sentry-tracing = { version = "0.27.0", optional = true }
 vergen = { version = "7.2.1" }
 
 # database
-sqlx = { optional = true, version = "0.5" }
+sqlx = { optional = true, version = "0.6" }
 postgres = { optional = true, version = "0.19" }
 
 # redis
