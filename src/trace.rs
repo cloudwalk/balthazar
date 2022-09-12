@@ -4,6 +4,7 @@ use axum::extract::{MatchedPath, OriginalUri};
 use chrono::{DateTime, SecondsFormat, Utc};
 use http::{header::HeaderName, HeaderMap, HeaderValue, Method, Request};
 use opentelemetry::sdk::propagation::TraceContextPropagator;
+use opentelemetry::sdk::trace::{self, Sampler};
 use opentelemetry::trace::TraceContextExt;
 use opentelemetry::{
     global,
@@ -82,6 +83,9 @@ pub struct TracingConfig {
     )]
     pub format: TracingFormat,
 
+    #[clap(long = "tracing-sample-rate", env = "TRACING_SAMPLE_RATE")]
+    pub sample_rate: Option<f64>,
+
     #[cfg(feature = "sentry")]
     #[clap(flatten)]
     pub honeycomb: HoneycombConfig,
@@ -114,10 +118,17 @@ impl Feature for Tracing {
         let telemetry_layer = if config.tracing.disable_opentelemetry {
             None
         } else {
+            let sampler = match config.tracing.sample_rate {
+                Some(v) => Sampler::TraceIdRatioBased(v),
+                None => Sampler::AlwaysOn,
+            };
+
             let tracer = opentelemetry_jaeger::new_pipeline()
                 .with_collector_endpoint(&config.tracing.opentelemetry_endpoint)
                 .with_service_name(service_name)
+                .with_trace_config(trace::config().with_sampler(sampler))
                 .install_batch(opentelemetry::runtime::Tokio)?;
+
             Some(
                 tracing_opentelemetry::layer()
                     .with_tracked_inactivity(false)
