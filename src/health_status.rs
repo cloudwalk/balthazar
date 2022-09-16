@@ -78,23 +78,23 @@ mod tests {
     #[tokio::test]
     async fn health_status_check() {
         let future = || async move {
-            sleep(Duration::from_millis(100)).await;
+            sleep(Duration::from_millis(1)).await;
             Ok::<(), eyre::Error>(())
         };
 
-        // timeout_ms = 200, degraded_ms = 150
-        // future sleeps for 100 ms so should be healthy
-        let report = HealthStatusReport::check_with_timeout_and_degrade(future(), 200, 150).await;
+        // timeout_ms = 10, degraded_ms = 5
+        // future sleeps for 1 ms so should be healthy
+        let report = HealthStatusReport::check_with_timeout_and_degrade(future(), 10, 5).await;
         assert!(matches!(report.status, HealthStatus::Healthy));
 
-        // timeout_ms = 200, degraded_ms = 50
-        // future sleeps for 100 ms so should be degraded
-        let report = HealthStatusReport::check_with_timeout_and_degrade(future(), 200, 50).await;
+        // timeout_ms = 10, degraded_ms = 0
+        // future sleeps for 1 ms so should be degraded
+        let report = HealthStatusReport::check_with_timeout_and_degrade(future(), 10, 0).await;
         assert!(matches!(report.status, HealthStatus::Degraded));
 
-        // timeout_ms = 50, degraded_ms = 30
-        // future sleeps for 100 ms so should be offline with matching message
-        let report = HealthStatusReport::check_with_timeout_and_degrade(future(), 50, 30).await;
+        // timeout_ms = 0, degraded_ms = 10
+        // future sleeps for 1 ms so should be offline with matching message
+        let report = HealthStatusReport::check_with_timeout_and_degrade(future(), 0, 10).await;
         assert!(matches!(report.status, HealthStatus::Offline { error: _ }));
         assert_eq!(
             report.status,
@@ -104,12 +104,12 @@ mod tests {
         );
 
         let future = || async move {
-            sleep(Duration::from_millis(100)).await;
+            sleep(Duration::from_millis(1)).await;
             Err::<(), eyre::Error>(eyre!("test error!".to_string()))
         };
-        // timeout_ms = 50, degraded_ms = 30
-        // future sleeps for 100 ms but return an error, so should be offline with matching message
-        let report = HealthStatusReport::check_with_timeout_and_degrade(future(), 150, 10).await;
+        // timeout_ms = 10, degraded_ms = 5
+        // future sleeps for 1 ms but return an error, so should be offline with matching message
+        let report = HealthStatusReport::check_with_timeout_and_degrade(future(), 10, 5).await;
         assert!(matches!(report.status, HealthStatus::Offline { error: _ }));
         assert_eq!(
             report.status,
