@@ -2,6 +2,7 @@ use std::fmt::Debug;
 
 pub mod build_info;
 mod core;
+pub mod health_status;
 mod lang;
 mod trace;
 
