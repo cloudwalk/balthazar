@@ -62,7 +62,11 @@ postgres = [
     "sqlx/postgres",
     "sqlx/runtime-tokio-rustls",
     "sqlx/uuid",
-    "sqlx/time"
+    "sqlx/time",
+    "sqlx/offline"
+]
+postgres-offline = [
+    "sqlx/offline"
 ]
 redis = [
     "bb8-redis"
