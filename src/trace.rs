@@ -43,10 +43,31 @@ const NOOP_SPAN_ID: &str = "00000000000000000000000000000000";
 // -----------------------------------------------------------------------------
 #[derive(clap::ArgEnum, Clone, Debug)]
 pub enum TracingFormat {
+    /// Tracing will not be logged to standard output.
+    /// Other layers like OpenTelemetry and Sentry will continue working.
     None,
+
     Hierarchical,
+
+    /// Tracing is formatted as text where each event takes 1 line.
+    /// Recommended for production if you want something easy to read and that don't need to parse
+    /// specific fields from the event.
+    Text,
+
+    /// Same as TextPretty.
+    #[deprecated]
     Pretty,
+
+    /// Tracing is formatted as text and each event can take multiple lines.
+    /// Recommended for local development.
+    TextPretty,
+
+    /// Tracing is formatted as JSON where each event takes 1 line.
+    /// Recommended for production if you need to parse specific fields from the event.
     Json,
+
+    /// Tracing is formatted as JSON and each event can take multiple lines.
+    /// Useful for local development whe debugging the JSON format.
     JsonPretty,
 }
 
@@ -79,7 +100,7 @@ pub struct TracingConfig {
         arg_enum,
         long = "tracing-format",
         env = "TRACING_FORMAT",
-        default_value = "pretty"
+        default_value = "text-pretty"
     )]
     pub format: TracingFormat,
 
@@ -138,13 +159,13 @@ impl Feature for Tracing {
 
         // SENTRY LAYER
         #[cfg(feature = "sentry")]
-        let honeycomb_trace = Some(HoneycombTraceOnSentryScope::new(
+        let honeycomb_layer = Some(HoneycombTraceOnSentryScope::new(
             config.tracing.honeycomb.honeycomb_team,
             service_name.to_string(),
             config.tracing.honeycomb.honeycomb_environment,
         ));
         #[cfg(not(feature = "sentry"))]
-        let honeycomb_trace: Option<HierarchicalLayer> = None; // generic type here does not matter because it will always be None
+        let honeycomb_layer: Option<HierarchicalLayer> = None; // generic type here does not matter because it will always be None
 
         #[cfg(feature = "sentry")]
         let sentry_layer = Some(sentry_tracing::layer());
@@ -152,37 +173,35 @@ impl Feature for Tracing {
         let sentry_layer: Option<HierarchicalLayer> = None; // generic type here does not matter because it will always be None
 
         // FORMATTER LAYER
-        // tracing_subscriber lib currently does not support dynamically adding layer to registry
-        // accordingly to some condition. this can be verified in the following issues:
-        // https://github.com/tokio-rs/tracing/issues/575
-        // https://github.com/tokio-rs/tracing/issues/1708
-        //
-        // but there is a workaround described here:
-        // https://github.com/tokio-rs/tracing/issues/894
-        //
-        // the workaround consists of passing a optional of Layer to every conditional layer,
-        // so if Some(layer) is passed, that layer is active, if None the layer is inactive.
-        let (layer_format_json, layer_format_pretty, layer_format_hierarchical) =
+        // fixed by https://github.com/tokio-rs/tracing/issues/575#issuecomment-1219566115
+        let formatter_layer =
             match config.tracing.format {
-                TracingFormat::None => (None, None, None),
-                TracingFormat::Json => (
+                TracingFormat::None => None,
+                TracingFormat::Json =>
                     Some(
                         Layer::default()
-                            .event_format(JsonFormatter::new(service_name.to_string(), false)),
+                            .event_format(JsonFormatter::new(service_name.to_string(), false))
+                            .boxed(),
                     ),
-                    None,
-                    None,
-                ),
-                TracingFormat::JsonPretty => (
+                TracingFormat::JsonPretty =>
                     Some(
                         Layer::default()
-                            .event_format(JsonFormatter::new(service_name.to_string(), true)),
+                            .event_format(JsonFormatter::new(service_name.to_string(), true))
+                            .boxed(),
                     ),
-                    None,
-                    None,
-                ),
-                TracingFormat::Pretty => (
-                    None,
+                TracingFormat::Text =>
+                    Some(
+                        Layer::default()
+                            .with_thread_ids(true)
+                            .with_thread_names(true)
+                            .with_target(true)
+                            .with_file(true)
+                            .with_line_number(true)
+                            .with_ansi(!config.core.no_color)
+                            .boxed(),
+                    ),
+                #[allow(deprecated)]
+                TracingFormat::TextPretty | TracingFormat::Pretty =>
                     Some(
                         Layer::default()
                             .pretty()
@@ -191,29 +210,24 @@ impl Feature for Tracing {
                             .with_target(true)
                             .with_file(true)
                             .with_line_number(true)
-                            .with_ansi(!config.core.no_color),
+                            .with_ansi(!config.core.no_color)
+                            .boxed(),
                     ),
-                    None,
-                ),
-                TracingFormat::Hierarchical => (
-                    None,
-                    None,
+                TracingFormat::Hierarchical =>
                     Some(
                         HierarchicalLayer::new(2)
                             .with_targets(true)
                             .with_bracketed_fields(true)
-                            .with_ansi(!config.core.no_color),
-                    ),
-                ),
+                            .with_ansi(!config.core.no_color)
+                            .boxed(),
+                    )
             };
 
         Registry::default()
             .with(EnvFilter::from_default_env())
             .with(telemetry_layer)
-            .with(layer_format_json)
-            .with(layer_format_pretty)
-            .with(layer_format_hierarchical)
-            .with(honeycomb_trace)
+            .with(formatter_layer)
+            .with(honeycomb_layer)
             .with(sentry_layer)
             .init();
 
