@@ -44,6 +44,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-tree = "0.2"
 sentry = "0.27.0"
 sentry-tracing = { version = "0.27.0", optional = true }
+metrics = "0.20.1"
 
 # build
 vergen = { version = "7.2.1" }

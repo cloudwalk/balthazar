@@ -4,6 +4,7 @@ pub mod build_info;
 mod core;
 pub mod health_status;
 mod lang;
+mod timeable;
 mod trace;
 
 pub use crate::core::CoreConfig;
@@ -34,8 +35,11 @@ pub use crate::postgres::{Postgres, PostgresConfig};
 
 #[cfg(feature = "redis")]
 mod redis;
+
 #[cfg(feature = "redis")]
 pub use crate::redis::{Redis, RedisConfig};
+
+pub use timeable::Timeable;
 
 // Feature enablement
 #[async_trait]
@@ -92,6 +96,7 @@ impl<T: Debug + Args> Config<T> {
         } = Self::parse();
 
         core::Core::init(service_name.as_ref(), environment.clone()).await?;
+        timeable::init(service_name.as_ref());
 
         Ok(Environment {
             service_name: service_name.as_ref().to_string(),
