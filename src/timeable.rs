@@ -27,7 +27,7 @@ pub trait Timeable<T> {
 #[crate::async_trait]
 impl<Fut, Res> Timeable<Res> for Fut
 where
-    Fut: Future<Output = Res> + Send,
+    Fut: Future<Output = Res> + Send
 {
     async fn time_as<S: Into<String> + Send>(self, task_name: S) -> Res {
         let start = Instant::now();

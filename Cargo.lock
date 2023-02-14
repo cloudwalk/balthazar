@@ -181,7 +181,6 @@ dependencies = [
  "eyre",
  "futures-util",
  "http",
- "lazy_static",
  "metrics",
  "opentelemetry",
  "opentelemetry-jaeger",
