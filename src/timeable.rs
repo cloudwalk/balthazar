@@ -2,19 +2,18 @@ use metrics::{describe_histogram, histogram};
 use std::future::Future;
 use tokio::time::Instant;
 
-static mut METRIC_NAME: String = String::new();
+use once_cell::sync::{Lazy, OnceCell};
+
+static METRIC_SUFFIX: Lazy<String> = Lazy::new(|| "task_duration_ms".to_string());
+
+static METRIC_NAME: OnceCell<String> = OnceCell::new();
 
 /// Inits the `timeable` module, creating and describing the metrics that will be tracked.
 pub fn init(service_name: &str) {
-    let metric_name = format!("{}_task_duration_ms", service_name);
+    let metric_name = format!("{}_{}", service_name, METRIC_SUFFIX.as_str());
 
-    describe_histogram!(
-        metric_name.clone(),
-        "Task execution duration in milliseconds."
-    );
-    unsafe {
-        METRIC_NAME = metric_name;
-    }
+    METRIC_NAME.get_or_init(|| metric_name.clone());
+    describe_histogram!(metric_name, "Task execution duration in milliseconds.");
 }
 
 /// Tracks execution duration of futures.
@@ -27,16 +26,14 @@ pub trait Timeable<T> {
 #[crate::async_trait]
 impl<Fut, Res> Timeable<Res> for Fut
 where
-    Fut: Future<Output = Res> + Send
+    Fut: Future<Output = Res> + Send,
 {
     async fn time_as<S: Into<String> + Send>(self, task_name: S) -> Res {
         let start = Instant::now();
         let result = self.await;
         let duration = Instant::now() - start;
 
-        unsafe {
-            histogram!(METRIC_NAME.as_ref(), duration.as_millis() as f64, "task" => task_name.into())
-        }
+        histogram!(METRIC_NAME.get().unwrap_or(&METRIC_SUFFIX).as_ref(), duration.as_millis() as f64, "task" => task_name.into());
 
         result
     }
