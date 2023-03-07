@@ -66,7 +66,6 @@ pub mod sensitive {
         T: Eq,
     {
         fn eq(&self, other: &Self) -> bool {
-            let other: &Sensitive<T> = other.clone();
             self.0.eq(other)
         }
     }
@@ -105,6 +104,16 @@ pub mod sensitive {
 
             let v: Sensitive<Vec<u8>> = vec![1, 2, 3].into();
             assert_eq!(*v.deref(), vec![1, 2, 3]);
+        }
+
+        #[test]
+        fn test_sensitive_equality() {
+            let sensitive = Sensitive::<String>("123456".to_string());
+            let other_sensitive = Sensitive::<String>("123456".to_string());
+            assert!(sensitive == other_sensitive);
+
+            let diff_sensitive = Sensitive::<String>("123".to_string());
+            assert!(sensitive != diff_sensitive);
         }
     }
 }

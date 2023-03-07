@@ -10,7 +10,7 @@ pub struct Core;
 
 #[crate::async_trait]
 impl Feature for Core {
-    async fn init(_service_name: &str, config: EnvironmentConfig) -> Result<Self> {
+    async fn init(_service_name: &str, config: &EnvironmentConfig) -> Result<Self> {
         if !config.core.no_color {
             color_eyre::install()?;
         }

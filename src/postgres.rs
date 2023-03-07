@@ -25,7 +25,7 @@ pub struct Postgres {
 
 #[crate::async_trait]
 impl Feature for Postgres {
-    async fn init(_service_name: &str, config: EnvironmentConfig) -> Result<Self> {
+    async fn init(_service_name: &str, config: &EnvironmentConfig) -> Result<Self> {
         Ok(Self {
             pool: PgPoolOptions::new()
                 .max_connections(config.postgres.pool_max_connections)
