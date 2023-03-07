@@ -44,7 +44,7 @@ pub use timeable::Timeable;
 // Feature enablement
 #[async_trait]
 pub trait Feature {
-    async fn init(service_name: &str, config: EnvironmentConfig) -> Result<Self>
+    async fn init(service_name: &str, config: &EnvironmentConfig) -> Result<Self>
     where
         Self: Sized;
 }
@@ -95,18 +95,18 @@ impl<T: Debug + Args> Config<T> {
             environment,
         } = Self::parse();
 
-        core::Core::init(service_name.as_ref(), environment.clone()).await?;
+        core::Core::init(service_name.as_ref(), &environment).await?;
         timeable::init(service_name.as_ref());
 
         Ok(Environment {
             service_name: service_name.as_ref().to_string(),
-            tracing: Tracing::init(service_name.as_ref(), environment.clone()).await?,
+            tracing: Tracing::init(service_name.as_ref(), &environment).await?,
 
             #[cfg(feature = "postgres")]
-            postgres: Postgres::init(service_name.as_ref(), environment.clone()).await?,
+            postgres: Postgres::init(service_name.as_ref(), &environment).await?,
 
             #[cfg(feature = "redis")]
-            redis: Redis::init(service_name.as_ref(), environment.clone()).await?,
+            redis: Redis::init(service_name.as_ref(), &environment).await?,
 
             config: Self {
                 project,

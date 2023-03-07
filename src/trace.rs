@@ -41,7 +41,7 @@ const NOOP_SPAN_ID: &str = "00000000000000000000000000000000";
 // -----------------------------------------------------------------------------
 // Supported Formats
 // -----------------------------------------------------------------------------
-#[derive(clap::ArgEnum, Clone, Debug)]
+#[derive(clap::ValueEnum, Clone, Debug)]
 pub enum TracingFormat {
     /// Tracing will not be logged to standard output.
     /// Other layers like OpenTelemetry and Sentry will continue working.
@@ -97,7 +97,7 @@ pub struct TracingConfig {
     pub log_level: String,
 
     #[clap(
-        arg_enum,
+        value_enum,
         long = "tracing-format",
         env = "TRACING_FORMAT",
         default_value = "text-pretty"
@@ -132,7 +132,7 @@ pub struct Tracing;
 
 #[async_trait]
 impl Feature for Tracing {
-    async fn init(service_name: &str, config: EnvironmentConfig) -> Result<Self> {
+    async fn init(service_name: &str, config: &EnvironmentConfig) -> Result<Self> {
         std::env::set_var("RUST_LOG", &config.tracing.log_level);
 
         // OPENTELEMETRY LAYER
@@ -144,8 +144,8 @@ impl Feature for Tracing {
                 None => Sampler::AlwaysOn,
             };
 
-            let tracer = opentelemetry_jaeger::new_pipeline()
-                .with_collector_endpoint(&config.tracing.opentelemetry_endpoint)
+            let tracer = opentelemetry_jaeger::new_agent_pipeline()
+                .with_endpoint(&config.tracing.opentelemetry_endpoint)
                 .with_service_name(service_name)
                 .with_trace_config(trace::config().with_sampler(sampler))
                 .install_batch(opentelemetry::runtime::Tokio)?;
@@ -160,9 +160,9 @@ impl Feature for Tracing {
         // SENTRY LAYER
         #[cfg(feature = "sentry")]
         let honeycomb_layer = Some(HoneycombTraceOnSentryScope::new(
-            config.tracing.honeycomb.honeycomb_team,
+            config.tracing.honeycomb.honeycomb_team.clone(),
             service_name.to_string(),
-            config.tracing.honeycomb.honeycomb_environment,
+            config.tracing.honeycomb.honeycomb_environment.clone(),
         ));
         #[cfg(not(feature = "sentry"))]
         let honeycomb_layer: Option<HierarchicalLayer> = None; // generic type here does not matter because it will always be None
@@ -174,54 +174,48 @@ impl Feature for Tracing {
 
         // FORMATTER LAYER
         // fixed by https://github.com/tokio-rs/tracing/issues/575#issuecomment-1219566115
-        let formatter_layer =
-            match config.tracing.format {
-                TracingFormat::None => None,
-                TracingFormat::Json =>
-                    Some(
-                        Layer::default()
-                            .event_format(JsonFormatter::new(service_name.to_string(), false))
-                            .boxed(),
-                    ),
-                TracingFormat::JsonPretty =>
-                    Some(
-                        Layer::default()
-                            .event_format(JsonFormatter::new(service_name.to_string(), true))
-                            .boxed(),
-                    ),
-                TracingFormat::Text =>
-                    Some(
-                        Layer::default()
-                            .with_thread_ids(true)
-                            .with_thread_names(true)
-                            .with_target(true)
-                            .with_file(true)
-                            .with_line_number(true)
-                            .with_ansi(!config.core.no_color)
-                            .boxed(),
-                    ),
-                #[allow(deprecated)]
-                TracingFormat::TextPretty | TracingFormat::Pretty =>
-                    Some(
-                        Layer::default()
-                            .pretty()
-                            .with_thread_ids(true)
-                            .with_thread_names(true)
-                            .with_target(true)
-                            .with_file(true)
-                            .with_line_number(true)
-                            .with_ansi(!config.core.no_color)
-                            .boxed(),
-                    ),
-                TracingFormat::Hierarchical =>
-                    Some(
-                        HierarchicalLayer::new(2)
-                            .with_targets(true)
-                            .with_bracketed_fields(true)
-                            .with_ansi(!config.core.no_color)
-                            .boxed(),
-                    )
-            };
+        let formatter_layer = match config.tracing.format {
+            TracingFormat::None => None,
+            TracingFormat::Json => Some(
+                Layer::default()
+                    .event_format(JsonFormatter::new(service_name.to_string(), false))
+                    .boxed(),
+            ),
+            TracingFormat::JsonPretty => Some(
+                Layer::default()
+                    .event_format(JsonFormatter::new(service_name.to_string(), true))
+                    .boxed(),
+            ),
+            TracingFormat::Text => Some(
+                Layer::default()
+                    .with_thread_ids(true)
+                    .with_thread_names(true)
+                    .with_target(true)
+                    .with_file(true)
+                    .with_line_number(true)
+                    .with_ansi(!config.core.no_color)
+                    .boxed(),
+            ),
+            #[allow(deprecated)]
+            TracingFormat::TextPretty | TracingFormat::Pretty => Some(
+                Layer::default()
+                    .pretty()
+                    .with_thread_ids(true)
+                    .with_thread_names(true)
+                    .with_target(true)
+                    .with_file(true)
+                    .with_line_number(true)
+                    .with_ansi(!config.core.no_color)
+                    .boxed(),
+            ),
+            TracingFormat::Hierarchical => Some(
+                HierarchicalLayer::new(2)
+                    .with_targets(true)
+                    .with_bracketed_fields(true)
+                    .with_ansi(!config.core.no_color)
+                    .boxed(),
+            ),
+        };
 
         Registry::default()
             .with(EnvFilter::from_default_env())
@@ -295,7 +289,7 @@ impl JsonFormatter {
     fn log_without_context(&self, writer: Writer<'_>, event: &Event) {
         // extract fields from event
         let event_fields = event.field_map();
-        let mut event_fields_as_value = match serde_json::to_value(&event_fields) {
+        let mut event_fields_as_value = match serde_json::to_value(event_fields) {
             Ok(v) => v,
             Err(_) => return, // unlikely to happen, so just ignore it for now
         };
@@ -483,16 +477,16 @@ where
             };
 
             // 1.5 - populate context data
-            for span_attr in span_attrs {
+            for (key, value) in span_attrs {
                 // parse key
-                let key = span_attr.key.to_string();
+                let key = key.to_string();
 
                 // track thread
                 if is_current_span && key == "thread.id" {
-                    field_thread_id = span_attr.value.to_string();
+                    field_thread_id = value.to_string();
                 }
                 if is_current_span && key == "thread.name" {
-                    field_thread_name = span_attr.value.to_string();
+                    field_thread_name = value.to_string();
                 }
 
                 // check ignored fields
@@ -502,7 +496,7 @@ where
 
                 // add attr to context if not already present because lower level attrs
                 // have precedence over higher level attrs if they have the same name
-                let value_wrapper = OpenTelemetryValue(span_attr.value.clone());
+                let value_wrapper = OpenTelemetryValue(value.clone());
                 if !field_context.contains_key(&key) {
                     field_context.insert(key, value_wrapper.into());
                 }
@@ -655,7 +649,7 @@ struct HeaderCarrier {
     pub headers: Vec<(HeaderName, HeaderValue)>,
 }
 
-impl<'a> Injector for HeaderCarrier {
+impl Injector for HeaderCarrier {
     fn set(&mut self, key: &str, value: String) {
         let header_name = HeaderName::from_str(key).expect("Must be header name");
         let header_value = HeaderValue::from_str(&value).expect("Must be a header value");
@@ -737,7 +731,7 @@ impl MakeRequestId for UuidMakeRequestId {
         let request_id: HeaderValue = request
             .headers()
             .get("x-request-id")
-            .map(|header| header.clone())
+            .cloned()
             .unwrap_or_else(|| Uuid::new_v4().to_string().parse().unwrap());
 
         Some(RequestId::new(request_id))
