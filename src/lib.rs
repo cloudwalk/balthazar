@@ -18,7 +18,7 @@ pub use crate::trace::{
 pub use async_trait::async_trait;
 pub use clap::{self, Args, Parser};
 pub use ethereum_types::{H128, H160, H256, H264, H32, H512, H520, H64, U128, U256, U512, U64};
-pub use eyre::Result;
+pub use eyre::{eyre as throw, Result};
 pub use futures_util::StreamExt;
 pub use quickcheck::Arbitrary;
 pub use serde::{self, Deserialize, Serialize};
