@@ -144,10 +144,11 @@ impl Feature for Tracing {
                 None => Sampler::AlwaysOn,
             };
 
-            let tracer = opentelemetry_jaeger::new_agent_pipeline()
+            let tracer = opentelemetry_jaeger::new_collector_pipeline()
                 .with_endpoint(&config.tracing.opentelemetry_endpoint)
                 .with_service_name(service_name)
                 .with_trace_config(trace::config().with_sampler(sampler))
+                .with_reqwest()
                 .install_batch(opentelemetry::runtime::Tokio)?;
 
             Some(
