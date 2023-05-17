@@ -39,6 +39,11 @@ mod redis;
 #[cfg(feature = "redis")]
 pub use crate::redis::{Redis, RedisConfig};
 
+#[cfg(feature = "streaming")]
+mod streaming;
+#[cfg(feature = "streaming")]
+pub use streaming::{KafkaClient, KafkaConfig, Message, StreamingClient};
+
 pub use timeable::Timeable;
 
 // Feature enablement
@@ -60,6 +65,9 @@ pub struct Environment<T: Debug + Args> {
 
     #[cfg(feature = "redis")]
     pub redis: Redis,
+
+    #[cfg(feature = "streaming")]
+    pub kafka: KafkaClient,
 }
 
 #[derive(Debug, Clone, Parser)]
@@ -77,6 +85,10 @@ pub struct EnvironmentConfig {
     #[cfg(feature = "redis")]
     #[clap(flatten)]
     pub redis: RedisConfig,
+
+    #[cfg(feature = "streaming")]
+    #[clap(flatten)]
+    pub kafka: KafkaConfig,
 }
 
 #[derive(Debug, Parser)]
@@ -107,6 +119,9 @@ impl<T: Debug + Args> Config<T> {
 
             #[cfg(feature = "redis")]
             redis: Redis::init(service_name.as_ref(), &environment).await?,
+
+            #[cfg(feature = "streaming")]
+            kafka: KafkaClient::new(&environment.kafka).await?,
 
             config: Self {
                 project,
