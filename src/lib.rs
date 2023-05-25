@@ -4,6 +4,7 @@ pub mod build_info;
 mod core;
 pub mod health_status;
 mod lang;
+pub mod test_utils;
 mod timeable;
 mod trace;
 

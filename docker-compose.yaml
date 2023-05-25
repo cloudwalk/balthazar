@@ -1,0 +1,31 @@
+version: '3.7'
+services:
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    ports:
+      - 9092:9092
+      - 29092:29092
+      - 39092:39092
+    environment:
+      KAFKA_BROKER_ID: "1"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_ADVERTISED_LISTENERS: LOCAL://127.0.0.1:29092,EXTERNAL://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: LOCAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: EXTERNAL
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      LOG4J_LOGGER_KAFKA: WARN
+      LOG4J_LOGGER_ORG_APACHE_KAFKA: WARN
+    networks:
+      - listener
+    depends_on:
+      - zookeeper
+
+  zookeeper:
+    image: zookeeper:3.8.0
+    ports:
+      - 22181:2181
+    networks:
+      - listener
+
+networks:
+  listener:
