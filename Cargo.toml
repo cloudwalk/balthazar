@@ -55,7 +55,7 @@ sqlx = { optional = true, version = "0.6" }
 postgres = { optional = true, version = "0.19" }
 
 # redis
-bb8-redis = { optional = true, version = "0.13" }
+bb8-redis = { optional = true, version = "0.13.1" }
 
 # streaming
 rdkafka = { version = "0.30.0", features = ["cmake_build", "ssl"], optional = true }
