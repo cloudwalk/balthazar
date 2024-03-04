@@ -48,7 +48,7 @@ sentry-tracing = { version = "0.31", optional = true }
 metrics = "0.21"
 
 # build
-vergen = { version = "7.5" }
+vergen = { version = "8.3.1" }
 
 # database
 sqlx = { optional = true, version = "0.6" }
